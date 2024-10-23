@@ -57,7 +57,7 @@ const Login = () => {
   };
 
   if (status === 'loading') {
-    return <div>Loading...</div>; // Optional loading state while NextAuth checks the session
+    return <div>Loading...</div>;
   }
 
   return (

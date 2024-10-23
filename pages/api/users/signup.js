@@ -1,6 +1,6 @@
-import { db } from '../../src/db';
+import { db } from '../../../src/db';
 import { collection, addDoc } from 'firebase/firestore';
-import { encryptData } from '../../src/lib/encryption';
+import { encryptData } from '../../../src/lib/encryption';
 export default async function handler(req, res) {
   if (req.method === 'POST') {
     const { username, doctorName, clinicName, password } = req.body;
