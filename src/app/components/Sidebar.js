@@ -6,10 +6,10 @@ import {
   FaMoneyBillAlt,
   FaHome,
   FaChartBar,
+  FaCalendarPlus
 } from 'react-icons/fa';
 import {
   FiCalendar,
-  FiUsers,
   FiAlertCircle,
   FiClipboard,
 } from 'react-icons/fi';
@@ -24,6 +24,8 @@ const Sidebar = ({ onMenuItemClick, activeItem }) => {
     { name: 'Appointments This Week', component: 'AppointmentsThisWeek', icon: <FiCalendar className="text-purple-500" /> },
     { name: 'Missed Appointments', component: 'MissedAppointments', icon: <FiAlertCircle className="text-red-500" /> },
     { name: 'Add Patient', component: 'AddPatient', icon: <FaUserPlus className="text-red-500" /> },
+    { name: 'Add Visit', component: 'AddVisit', icon: <FaCalendarPlus className="text-sky-500" /> },
+
     { name: 'Search Patient', component: 'SearchPatient', icon: <FaSearch className="text-blue-500" /> },
     { name: 'Update Profile', component: 'UpdateProfile', icon: <FaUserEdit className="text-green-500" /> },
     { name: 'Patients with Balance', component: 'PatientBalance', icon: <FaMoneyBillAlt className="text-yellow-500" /> },

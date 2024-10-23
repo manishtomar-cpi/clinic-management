@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { FaUserMd, FaClinicMedical, FaLock, FaUser, FaHeartbeat, FaEye, FaEyeSlash, FaQuestionCircle } from 'react-icons/fa';
+import OSMSearch from '../components/OSMInput';
 import { showToast } from '../components/Toast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -20,6 +21,10 @@ const Signup = () => {
   const [usernameAvailable, setUsernameAvailable] = useState(null);
 
   const router = useRouter();
+
+  const handleSelectLocation = (location) => {
+    setFormData({ ...formData, clinicLocation: location.display_name });
+  };
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -179,6 +184,9 @@ const Signup = () => {
             </div>
           </div>
 
+            {/* Clinic Location (OSM Search) */}
+            <OSMSearch onSelectLocation={handleSelectLocation} />
+
           {/* Password */}
           <div className="mb-6">
             <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">Password</label>
@@ -221,7 +229,7 @@ const Signup = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`w-full flex justify-center items-center bg-gradient-to-br from-blue-600 to-teal-400 text-white py-3 rounded-full font-medium transition duration-300 shadow-lg ${
+            className={`w-full flex justify-center items-center bg-gradient-to-br from-blue-600 to-teal-400 text-white py-3 rounded-lg font-medium transition duration-300 shadow-lg ${
               isSubmitting ? 'cursor-not-allowed opacity-50' : 'hover:bg-gradient-to-br hover:from-blue-500 hover:to-teal-300'
             }`}
           >

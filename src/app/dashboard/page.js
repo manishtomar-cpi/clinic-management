@@ -14,6 +14,7 @@ import PatientBalance from '../components/PatientBalance';
 import OngoingPatients from '../components/OngoingPatients';
 import AppointmentsToday from '../components/AppointmentsToday';
 import AppointmentsThisWeek from '../components/AppointmentsThisWeek';
+import AddVisit from '../components/AddVisit';
 import MissedAppointments from '../components/MissedAppointments';
 import { decryptData } from '../../lib/encryption'; // Import your decryption function
 
@@ -100,6 +101,8 @@ const DashboardPage = () => {
     switch (activeContent) {
       case 'AddPatient':
         return <AddPatient />;
+        case 'AddVisit':
+          return <AddVisit />;
       case 'SearchPatient':
         return <SearchPatient />;
       case 'UpdateProfile':
@@ -145,8 +148,8 @@ const DashboardPage = () => {
               : activeContent.replace(/([A-Z])/g, ' $1').trim()}
           </h1>
         </div>
-        
-        {/* Doctor Information */}
+{/*         
+        Doctor Information
         <div className="bg-white p-4 rounded-lg shadow-md mb-6 flex items-center justify-between">
           <div className="flex items-center">
             <FiUser className="text-blue-600 text-4xl mr-4" />
@@ -162,7 +165,7 @@ const DashboardPage = () => {
               <p className="text-gray-500">Clinic Location & Details</p>
             </div>
           </div>
-        </div>
+        </div> */}
 
         <div>{renderContent()}</div>
       </div>

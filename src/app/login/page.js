@@ -124,7 +124,7 @@ const Login = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`w-full flex justify-center items-center bg-gradient-to-br from-blue-600 to-teal-400 text-white py-3 rounded-full font-medium transition duration-300 shadow-lg ${
+            className={`w-full flex justify-center items-center bg-gradient-to-br from-blue-600 to-teal-400 text-white py-3 rounded-lg font-medium transition duration-300 shadow-lg ${
               isSubmitting ? 'cursor-not-allowed opacity-50' : 'hover:bg-gradient-to-br hover:from-blue-500 hover:to-teal-300'
             }`}
           >

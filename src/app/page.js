@@ -25,8 +25,14 @@ const Home = () => {
     }
   };
 
+
   const handleSignupClick = () => {
-    router.push('/signup');
+    // If the user is authenticated, redirect to the dashboard, otherwise go to signup
+    if (status === 'authenticated') {
+      router.push('/dashboard');
+    } else {
+      router.push('/signup');
+    }
   };
 
   return (
@@ -45,13 +51,13 @@ const Home = () => {
             <div className="flex space-x-4">
               <button
                 onClick={handleSignupClick}
-                className="bg-white text-blue-600 py-3 px-6 rounded-full text-lg font-medium hover:bg-gray-100 transition duration-300 shadow-lg animate-fadeInLeft"
+                className="bg-white text-blue-600 py-3 px-6 rounded-lg text-lg font-medium hover:bg-gray-100 transition duration-300 shadow-lg animate-fadeInLeft"
               >
                 Get Started
               </button>
               <button
                 onClick={handleLoginClick}
-                className="bg-transparent border border-white py-3 px-6 rounded-full text-lg font-medium hover:bg-white hover:text-blue-600 transition duration-300 shadow-lg animate-fadeInRight"
+                className="bg-transparent border border-white py-3 px-6 rounded-lg text-lg font-medium hover:bg-white hover:text-blue-600 transition duration-300 shadow-lg animate-fadeInRight"
               >
                 {status === 'authenticated' ? 'Dashboard' : 'Login'}
               </button>
@@ -159,22 +165,22 @@ const Home = () => {
             Sign up today and take the first step towards a more efficient practice.
           </p>
           <button
-            onClick={handleSignupClick}
-            className="bg-white text-blue-600 py-3 px-8 rounded-full text-lg font-medium hover:bg-gray-100 transition duration-300 shadow-lg"
-          >
-            Get Started Now
-          </button>
+        onClick={handleSignupClick}
+        className="bg-white text-blue-600 py-3 px-8 rounded-lg text-lg font-medium hover:bg-gray-100 transition duration-300 shadow-lg"
+      >
+        {status === 'authenticated' ? 'Go to Dashboard' : 'Get Started Now'}
+      </button>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="w-full bg-gradient-to-br from-blue-600 to-teal-400 text-white py-6">
+      {/* <footer className="w-full bg-gradient-to-br from-blue-600 to-teal-400 text-white py-6">
         <div className="container mx-auto px-4 text-center">
           <p>
             &copy; {new Date().getFullYear()} Clinic Management App. All rights reserved.
           </p>
         </div>
-      </footer>
+      </footer> */}
 
       {/* Animation Styles */}
       <style jsx>{`
