@@ -1,101 +1,271 @@
-import Image from "next/image";
+// pages/index.js
+"use client";
+import React from 'react';
+import {
+  FaUserMd,
+  FaNotesMedical,
+  FaCalendarCheck,
+  FaSearch,
+  FaClinicMedical,
+  FaUsers,
+  FaStethoscope,
+} from 'react-icons/fa';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
-export default function Home() {
+const Home = () => {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  const handleLoginClick = () => {
+    if (status === 'authenticated') {
+      router.push('/dashboard');
+    } else {
+      router.push('/login');
+    }
+  };
+
+  const handleSignupClick = () => {
+    router.push('/signup');
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Hero Section */}
+      <header className="relative bg-gradient-to-br from-blue-600 to-teal-400 text-white overflow-hidden">
+        <div className="container mx-auto px-4 py-20 md:py-32 flex flex-col md:flex-row items-center">
+          {/* Text Content */}
+          <div className="md:w-1/2">
+            <h1 className="text-4xl md:text-6xl font-bold mb-4 animate-fadeInDown">
+              Manage Your Clinic Effortlessly
+            </h1>
+            <p className="text-lg md:text-2xl mb-6 animate-fadeInUp">
+              A comprehensive solution for doctors to streamline clinic operations and enhance patient care.
+            </p>
+            <div className="flex space-x-4">
+              <button
+                onClick={handleSignupClick}
+                className="bg-white text-blue-600 py-3 px-6 rounded-full text-lg font-medium hover:bg-gray-100 transition duration-300 shadow-lg animate-fadeInLeft"
+              >
+                Get Started
+              </button>
+              <button
+                onClick={handleLoginClick}
+                className="bg-transparent border border-white py-3 px-6 rounded-full text-lg font-medium hover:bg-white hover:text-blue-600 transition duration-300 shadow-lg animate-fadeInRight"
+              >
+                {status === 'authenticated' ? 'Dashboard' : 'Login'}
+              </button>
+            </div>
+          </div>
+          {/* Image or Illustration */}
+          <div className="md:w-1/2 mt-10 md:mt-0 flex justify-center md:justify-end">
+            <FaClinicMedical className="text-white text-9xl animate-float" />
+          </div>
+        </div>
+        {/* Decorative Background Circles */}
+        <div className="absolute top-0 left-0 w-64 h-64 bg-blue-700 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+        <div className="absolute bottom-0 right-0 w-64 h-64 bg-teal-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      {/* Main Content */}
+      <main className="flex-grow container mx-auto px-4 py-12 md:py-16">
+        {/* Introduction Section */}
+        <section className="text-center mb-16">
+          <h2 className="text-3xl md:text-5xl font-bold text-gray-800 mb-4">
+            Empowering Clinics Across the Globe
+          </h2>
+          <p className="text-lg md:text-xl text-gray-600">
+            Join a community of doctors transforming patient care with efficient clinic management.
+          </p>
+        </section>
+
+        {/* Features Sections */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Feature 1 */}
+          <div className="flex flex-col items-center bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition duration-300 transform hover:-translate-y-1">
+            <FaUsers className="text-blue-500 text-6xl mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700">
+              Multi-Clinic Management
+            </h3>
+            <p className="mt-2 text-gray-600 text-center">
+              Manage multiple clinics seamlessly, track performances, and coordinate across locations.
+            </p>
+          </div>
+
+          {/* Feature 2 */}
+          <div className="flex flex-col items-center bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition duration-300 transform hover:-translate-y-1">
+            <FaUserMd className="text-green-500 text-6xl mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700">
+              Patient Records
+            </h3>
+            <p className="mt-2 text-gray-600 text-center">
+              Maintain comprehensive patient profiles with medical history, treatments, and visit summaries.
+            </p>
+          </div>
+
+          {/* Feature 3 */}
+          <div className="flex flex-col items-center bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition duration-300 transform hover:-translate-y-1">
+            <FaCalendarCheck className="text-purple-500 text-6xl mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700">
+              Appointment Scheduling
+            </h3>
+            <p className="mt-2 text-gray-600 text-center">
+              Efficiently schedule appointments, send reminders, and reduce no-shows with ease.
+            </p>
+          </div>
+
+          {/* Feature 4 */}
+          <div className="flex flex-col items-center bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition duration-300 transform hover:-translate-y-1">
+            <FaNotesMedical className="text-red-500 text-6xl mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700">
+              Visit Documentation
+            </h3>
+            <p className="mt-2 text-gray-600 text-center">
+              Document patient visits thoroughly with notes, prescriptions, and follow-up plans.
+            </p>
+          </div>
+
+          {/* Feature 5 */}
+          <div className="flex flex-col items-center bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition duration-300 transform hover:-translate-y-1">
+            <FaSearch className="text-indigo-500 text-6xl mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700">
+              Advanced Search
+            </h3>
+            <p className="mt-2 text-gray-600 text-center">
+              Quickly find patient records, appointments, and clinic data with powerful search tools.
+            </p>
+          </div>
+
+          {/* Feature 6 */}
+          <div className="flex flex-col items-center bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition duration-300 transform hover:-translate-y-1">
+            <FaStethoscope className="text-yellow-500 text-6xl mb-4" />
+            <h3 className="text-xl font-semibold text-gray-700">
+              Collaborative Care
+            </h3>
+            <p className="mt-2 text-gray-600 text-center">
+              Collaborate with other doctors, share insights, and enhance patient treatment plans.
+            </p>
+          </div>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      {/* Call to Action */}
+      <section className="bg-gradient-to-br from-blue-600 to-teal-400 text-white py-12">
+        <div className="container mx-auto px-4 text-center">
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">
+            Ready to Transform Your Clinic?
+          </h2>
+          <p className="text-lg md:text-xl mb-8">
+            Sign up today and take the first step towards a more efficient practice.
+          </p>
+          <button
+            onClick={handleSignupClick}
+            className="bg-white text-blue-600 py-3 px-8 rounded-full text-lg font-medium hover:bg-gray-100 transition duration-300 shadow-lg"
+          >
+            Get Started Now
+          </button>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="w-full bg-gradient-to-br from-blue-600 to-teal-400 text-white py-6">
+        <div className="container mx-auto px-4 text-center">
+          <p>
+            &copy; {new Date().getFullYear()} Clinic Management App. All rights reserved.
+          </p>
+        </div>
       </footer>
+
+      {/* Animation Styles */}
+      <style jsx>{`
+        /* Animations */
+        @keyframes fadeInDown {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeInDown {
+          animation: fadeInDown 1s ease-out forwards;
+        }
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeInUp {
+          animation: fadeInUp 1s ease-out forwards;
+        }
+        @keyframes fadeInLeft {
+          from {
+            opacity: 0;
+            transform: translateX(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        .animate-fadeInLeft {
+          animation: fadeInLeft 1s ease-out forwards;
+        }
+        @keyframes fadeInRight {
+          from {
+            opacity: 0;
+            transform: translateX(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+        .animate-fadeInRight {
+          animation: fadeInRight 1s ease-out forwards;
+        }
+        @keyframes float {
+          0% {
+            transform: translatey(0px);
+          }
+          50% {
+            transform: translatey(-20px);
+          }
+          100% {
+            transform: translatey(0px);
+          }
+        }
+        .animate-float {
+          animation: float 3s ease-in-out infinite;
+        }
+        @keyframes blob {
+          0%,
+          100% {
+            transform: translate(0px, 0px) scale(1);
+          }
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+        }
+        .animate-blob {
+          animation: blob 8s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+      `}</style>
     </div>
   );
-}
+};
+
+export default Home;
