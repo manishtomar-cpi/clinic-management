@@ -40,7 +40,7 @@ const Home = () => {
           {/* Text Content */}
           <div className="md:w-1/2">
             <h1 className="text-4xl md:text-6xl font-bold mb-4 animate-fadeInDown">
-              Welcome to MedFlow
+              Welcome to CareSync
             </h1>
             <p className="text-lg md:text-2xl mb-6 animate-fadeInUp">
               A comprehensive solution for doctors to streamline clinic operations and enhance patient care.
