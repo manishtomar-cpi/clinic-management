@@ -1,3 +1,4 @@
+// pages/index.js
 "use client";
 import React from 'react';
 import {
@@ -7,7 +8,13 @@ import {
   FaSearch,
   FaClinicMedical,
   FaUsers,
-  FaShieldAlt, // New icon for Data Security
+  FaShieldAlt,
+  FaSignInAlt,
+  FaTachometerAlt,
+  FaClipboardList,
+  FaUserCheck,
+  FaLock,
+  FaArrowRight,
 } from 'react-icons/fa';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -150,6 +157,73 @@ const Home = () => {
             </p>
           </div>
         </div>
+
+        {/* How It Works Section */}
+        <section className="mt-16">
+          <h2 className="text-3xl md:text-5xl font-bold text-gray-800 mb-8 text-center">
+            How ClinicEase Works
+          </h2>
+          <div className="flex flex-col md:flex-row items-center justify-center space-y-8 md:space-y-0 md:space-x-4">
+            {/* Step 1 */}
+            <div className="flex flex-col items-center">
+              <FaSignInAlt className="text-blue-500 text-6xl mb-4" />
+              <h3 className="text-xl font-semibold text-gray-700">
+                Sign Up / Login
+              </h3>
+              <p className="mt-2 text-gray-600 text-center">
+                Create an account or log in to access your dashboard.
+              </p>
+            </div>
+            {/* Arrow */}
+            <FaArrowRight className="hidden md:block text-gray-400 text-3xl" />
+            {/* Step 2 */}
+            <div className="flex flex-col items-center">
+              <FaTachometerAlt className="text-green-500 text-6xl mb-4" />
+              <h3 className="text-xl font-semibold text-gray-700">
+                Access Dashboard
+              </h3>
+              <p className="mt-2 text-gray-600 text-center">
+                View your clinic's performance and key metrics.
+              </p>
+            </div>
+            {/* Arrow */}
+            <FaArrowRight className="hidden md:block text-gray-400 text-3xl" />
+            {/* Step 3 */}
+            <div className="flex flex-col items-center ">
+              <FaClipboardList className="text-purple-500 text-6xl mb-4" />
+              <h3 className="text-xl font-semibold text-gray-700">
+                Appointments
+              </h3>
+              <p className="mt-2 text-gray-600 text-center">
+                Schedule and organize appointments with ease.
+              </p>
+            </div>
+            {/* Arrow */}
+            <FaArrowRight className="hidden md:block text-gray-400 text-3xl" />
+            {/* Step 4 */}
+            <div className="flex flex-col items-center">
+              <FaUserCheck className="text-red-500 text-6xl mb-4" />
+              <h3 className="text-xl font-semibold text-gray-700">
+                Update Records
+              </h3>
+              <p className="mt-2 text-gray-600 text-center">
+                Maintain up-to-date patient records and treatment plans.
+              </p>
+            </div>
+            {/* Arrow */}
+            <FaArrowRight className="hidden md:block text-gray-400 text-3xl" />
+            {/* Step 5 */}
+            <div className="flex flex-col items-center">
+              <FaLock className="text-yellow-500 text-6xl mb-4" />
+              <h3 className="text-xl font-semibold text-gray-700">
+                Secure Data
+              </h3>
+              <p className="mt-2 text-gray-600 text-center">
+                All data is encrypted and securely stored.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* Call to Action */}
