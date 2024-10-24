@@ -4,7 +4,7 @@ const AppointmentsToday = () => {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4">Appointments Today</h2>
-      <p>This is where you can see today's appointments.</p>
+      <p>This is where you can see today&apos;s appointments.</p>
       {/* Add more content or functionality as needed */}
     </div>
   );
