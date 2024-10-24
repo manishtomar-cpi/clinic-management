@@ -1,4 +1,3 @@
-// pages/index.js
 "use client";
 import React from 'react';
 import {
@@ -8,7 +7,7 @@ import {
   FaSearch,
   FaClinicMedical,
   FaUsers,
-  FaStethoscope,
+  FaShieldAlt, // New icon for Data Security
 } from 'react-icons/fa';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -25,9 +24,7 @@ const Home = () => {
     }
   };
 
-
   const handleSignupClick = () => {
-    // If the user is authenticated, redirect to the dashboard, otherwise go to signup
     if (status === 'authenticated') {
       router.push('/dashboard');
     } else {
@@ -43,7 +40,7 @@ const Home = () => {
           {/* Text Content */}
           <div className="md:w-1/2">
             <h1 className="text-4xl md:text-6xl font-bold mb-4 animate-fadeInDown">
-              Manage Your Clinic Effortlessly
+              Welcome to MedFlow
             </h1>
             <p className="text-lg md:text-2xl mb-6 animate-fadeInUp">
               A comprehensive solution for doctors to streamline clinic operations and enhance patient care.
@@ -142,14 +139,14 @@ const Home = () => {
             </p>
           </div>
 
-          {/* Feature 6 */}
+          {/* Feature 6 - Data Security */}
           <div className="flex flex-col items-center bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition duration-300 transform hover:-translate-y-1">
-            <FaStethoscope className="text-yellow-500 text-6xl mb-4" />
+            <FaShieldAlt className="text-yellow-500 text-6xl mb-4" />
             <h3 className="text-xl font-semibold text-gray-700">
-              Collaborative Care
+              Data Security
             </h3>
             <p className="mt-2 text-gray-600 text-center">
-              Collaborate with other doctors, share insights, and enhance patient treatment plans.
+              Protect patient data with advanced encryption and secure storage.
             </p>
           </div>
         </div>
@@ -165,22 +162,13 @@ const Home = () => {
             Sign up today and take the first step towards a more efficient practice.
           </p>
           <button
-        onClick={handleSignupClick}
-        className="bg-white text-blue-600 py-3 px-8 rounded-lg text-lg font-medium hover:bg-gray-100 transition duration-300 shadow-lg"
-      >
-        {status === 'authenticated' ? 'Go to Dashboard' : 'Get Started Now'}
-      </button>
+            onClick={handleSignupClick}
+            className="bg-white text-blue-600 py-3 px-8 rounded-lg text-lg font-medium hover:bg-gray-100 transition duration-300 shadow-lg"
+          >
+            {status === 'authenticated' ? 'Go to Dashboard' : 'Get Started Now'}
+          </button>
         </div>
       </section>
-
-      {/* Footer */}
-      {/* <footer className="w-full bg-gradient-to-br from-blue-600 to-teal-400 text-white py-6">
-        <div className="container mx-auto px-4 text-center">
-          <p>
-            &copy; {new Date().getFullYear()} Clinic Management App. All rights reserved.
-          </p>
-        </div>
-      </footer> */}
 
       {/* Animation Styles */}
       <style jsx>{`
@@ -210,32 +198,6 @@ const Home = () => {
         }
         .animate-fadeInUp {
           animation: fadeInUp 1s ease-out forwards;
-        }
-        @keyframes fadeInLeft {
-          from {
-            opacity: 0;
-            transform: translateX(-20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        .animate-fadeInLeft {
-          animation: fadeInLeft 1s ease-out forwards;
-        }
-        @keyframes fadeInRight {
-          from {
-            opacity: 0;
-            transform: translateX(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        .animate-fadeInRight {
-          animation: fadeInRight 1s ease-out forwards;
         }
         @keyframes float {
           0% {

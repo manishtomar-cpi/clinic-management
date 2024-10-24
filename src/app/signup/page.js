@@ -1,11 +1,26 @@
+// src/pages/signup.js
+
 "use client";
-import React, { useState } from 'react';
-import { FaUserMd, FaClinicMedical, FaLock, FaUser, FaHeartbeat, FaEye, FaEyeSlash, FaQuestionCircle } from 'react-icons/fa';
-import OSMSearch from '../components/OSMInput';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  FaUserMd,
+  FaClinicMedical,
+  FaLock,
+  FaUser,
+  FaHeartbeat,
+  FaEye,
+  FaEyeSlash,
+  FaQuestionCircle,
+  FaSpinner,
+  FaCheck,
+  FaMapMarkerAlt,
+  FaTimes,
+} from 'react-icons/fa';
 import { showToast } from '../components/Toast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import debounce from 'lodash.debounce';
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -13,30 +28,76 @@ const Signup = () => {
     doctorName: '',
     clinicName: '',
     password: '',
+    clinicLocation: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordInfo, setShowPasswordInfo] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+  const [usernameError, setUsernameError] = useState('');
   const [usernameAvailable, setUsernameAvailable] = useState(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
 
   const router = useRouter();
 
-  const handleSelectLocation = (location) => {
-    setFormData({ ...formData, clinicLocation: location.display_name });
+  const validateUsername = (username) => {
+    // Username must be at least 6 characters and can include letters, digits, underscores, and periods
+    const usernamePattern = /^[a-zA-Z0-9._]{6,}$/;
+    if (!usernamePattern.test(username)) {
+      return 'Username must be at least 6 characters and can include letters, digits, underscores, and periods.';
+    }
+    return '';
   };
 
+  const debouncedCheckUsername = useCallback(
+    debounce(async (username) => {
+      if (usernameError) {
+        setUsernameAvailable(null);
+        return;
+      }
+      setCheckingUsername(true);
+      try {
+        const response = await axios.get(`/api/users/check-username?username=${username}`);
+        if (response.data.available) {
+          setUsernameAvailable(true);
+        } else {
+          setUsernameAvailable(false);
+        }
+      } catch (error) {
+        console.error('Error checking username:', error);
+        showToast('Error checking username. Please try again.', 'error');
+        setUsernameAvailable(false);
+      } finally {
+        setCheckingUsername(false);
+      }
+    }, 500),
+    [usernameError]
+  );
+
+  useEffect(() => {
+    // Cleanup function to cancel debounce on unmount
+    return () => {
+      debouncedCheckUsername.cancel();
+    };
+  }, [debouncedCheckUsername]);
+
   const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
 
     // Password validation
-    if (e.target.name === 'password') {
-      validatePassword(e.target.value);
+    if (name === 'password') {
+      validatePassword(value);
     }
 
-    // Reset username availability if username field changes
-    if (e.target.name === 'username') {
-      setUsernameAvailable(null);
+    // Username validation
+    if (name === 'username') {
+      const error = validateUsername(value);
+      setUsernameError(error);
+      setUsernameAvailable(null); // Reset availability
+      if (!error) {
+        debouncedCheckUsername(value);
+      }
     }
   };
 
@@ -49,32 +110,27 @@ const Signup = () => {
     }
   };
 
-  const checkUsernameAvailability = async () => {
-    try {
-      const response = await axios.get(`/api/users/check-username?username=${formData.username}`);
-      if (response.data.available) {
-        setUsernameAvailable(true);
-        showToast('Username is available!', 'success');
-      } else {
-        setUsernameAvailable(false);
-        showToast('Username is already taken.', 'error');
-      }
-    } catch (error) {
-      console.error('Error checking username:', error);
-      showToast('Error checking username. Please try again.', 'error');
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Client-side validations
     if (passwordError) {
       showToast(passwordError, 'error');
       return;
     }
 
-    if (usernameAvailable === false) {
-      showToast('Please choose a different username.', 'error');
+    if (usernameError) {
+      showToast(usernameError, 'error');
+      return;
+    }
+
+    if (usernameAvailable === false || usernameAvailable === null) {
+      showToast('Please choose a valid and available username.', 'error');
+      return;
+    }
+
+    if (!formData.clinicLocation.trim()) {
+      showToast('Please enter your clinic location.', 'error');
       return;
     }
 
@@ -91,7 +147,12 @@ const Signup = () => {
         showToast('Signup failed! Please try again.', 'error');
       }
     } catch (error) {
-      showToast('Signup failed! Please try again.', 'error');
+      // Check if the error is due to username already taken
+      if (error.response && error.response.status === 409) {
+        showToast('Username is already taken. Please choose a different username.', 'error');
+      } else {
+        showToast('Signup failed! Please try again.', 'error');
+      }
       console.error('Signup Error:', error);
     } finally {
       setIsSubmitting(false);
@@ -123,8 +184,10 @@ const Signup = () => {
           <h2 className="text-3xl font-semibold text-gray-800 mb-6 text-center">Doctor Signup</h2>
 
           {/* Doctor Username */}
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="username">Doctor Username</label>
+          <div className="mb-4 relative">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="username">
+              Doctor Username
+            </label>
             <div className="flex items-center bg-gray-100 p-2 rounded">
               <FaUser className="text-blue-500 mr-2" />
               <input
@@ -137,20 +200,32 @@ const Signup = () => {
                 required
                 className="bg-gray-100 focus:outline-none w-full"
               />
-              <button
-                type="button"
-                onClick={checkUsernameAvailability}
-                className="ml-2 text-blue-500 hover:text-blue-700"
-              >
-                Check Availability
-              </button>
+              {checkingUsername && (
+                <FaSpinner className="animate-spin text-gray-500 ml-2" />
+              )}
+              {!checkingUsername && usernameAvailable && (
+                <FaCheck className="text-green-500 ml-2" />
+              )}
+              {!checkingUsername && usernameAvailable === false && (
+                <FaTimes className="text-red-500 ml-2" />
+              )}
             </div>
-            {usernameAvailable === false && <p className="text-red-500 text-xs mt-1">Username is already taken.</p>}
+            {usernameError && (
+              <p className="text-red-500 text-xs mt-1">{usernameError}</p>
+            )}
+            {!usernameError && usernameAvailable === false && (
+              <p className="text-red-500 text-xs mt-1">Username is already taken.</p>
+            )}
+            {!usernameError && usernameAvailable && (
+              <p className="text-green-500 text-xs mt-1">Username is available!</p>
+            )}
           </div>
 
           {/* Doctor Name */}
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="doctorName">Doctor Name</label>
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="doctorName">
+              Doctor Name
+            </label>
             <div className="flex items-center bg-gray-100 p-2 rounded">
               <FaUserMd className="text-green-500 mr-2" />
               <input
@@ -168,7 +243,9 @@ const Signup = () => {
 
           {/* Clinic Name */}
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="clinicName">Clinic Name</label>
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="clinicName">
+              Clinic Name
+            </label>
             <div className="flex items-center bg-gray-100 p-2 rounded">
               <FaClinicMedical className="text-teal-500 mr-2" />
               <input
@@ -184,12 +261,31 @@ const Signup = () => {
             </div>
           </div>
 
-            {/* Clinic Location (OSM Search) */}
-            <OSMSearch onSelectLocation={handleSelectLocation} />
+          {/* Clinic Location (Simple Input Field) */}
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="clinicLocation">
+              Clinic Location
+            </label>
+            <div className="flex items-center bg-gray-100 p-2 rounded">
+              <FaMapMarkerAlt className="text-red-500 mr-2" />
+              <input
+                type="text"
+                name="clinicLocation"
+                id="clinicLocation"
+                value={formData.clinicLocation}
+                onChange={handleInputChange}
+                placeholder="Enter your clinic location"
+                required
+                className="bg-gray-100 focus:outline-none w-full"
+              />
+            </div>
+          </div>
 
           {/* Password */}
-          <div className="mb-6">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">Password</label>
+          <div className="mb-6 relative">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
+              Password
+            </label>
             <div className="flex items-center bg-gray-100 p-2 rounded relative">
               <FaLock className="text-red-500 mr-2" />
               <input
@@ -217,7 +313,9 @@ const Signup = () => {
                 <FaQuestionCircle />
               </button>
             </div>
-            {passwordError && <p className="text-red-500 text-xs mt-1">{passwordError}</p>}
+            {passwordError && (
+              <p className="text-red-500 text-xs mt-1">{passwordError}</p>
+            )}
             {showPasswordInfo && (
               <p className="text-gray-500 text-xs mt-2">
                 Password must be at least 8 characters, include one uppercase letter, and one special character.
@@ -230,11 +328,13 @@ const Signup = () => {
             type="submit"
             disabled={isSubmitting}
             className={`w-full flex justify-center items-center bg-gradient-to-br from-blue-600 to-teal-400 text-white py-3 rounded-lg font-medium transition duration-300 shadow-lg ${
-              isSubmitting ? 'cursor-not-allowed opacity-50' : 'hover:bg-gradient-to-br hover:from-blue-500 hover:to-teal-300'
+              isSubmitting
+                ? 'cursor-not-allowed opacity-50'
+                : 'hover:bg-gradient-to-br hover:from-blue-500 hover:to-teal-300'
             }`}
           >
             {isSubmitting ? (
-              <FaHeartbeat className="animate-pulse text-xl mr-2" />
+              <FaSpinner className="animate-spin text-xl mr-2" />
             ) : (
               <FaUserMd className="text-xl mr-2" />
             )}

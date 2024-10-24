@@ -1,3 +1,5 @@
+// src/components/Sidebar.js
+
 import React, { useState } from 'react';
 import {
   FaUserPlus,
@@ -6,35 +8,71 @@ import {
   FaMoneyBillAlt,
   FaHome,
   FaChartBar,
-  FaCalendarPlus
+  FaCalendarPlus,
+  FaCalendarCheck,
 } from 'react-icons/fa';
-import {
-  FiCalendar,
-  FiAlertCircle,
-  FiClipboard,
-} from 'react-icons/fi';
+import { FiCalendar, FiAlertCircle, FiClipboard } from 'react-icons/fi';
 
 const Sidebar = ({ onMenuItemClick, activeItem }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const menuItems = [
-    { name: 'Dashboard', component: 'Dashboard', icon: <FaChartBar className="text-indigo-500" /> },
-    { name: 'Ongoing Patients', component: 'OngoingPatients', icon: <FiClipboard className="text-blue-500" /> },
-    { name: 'Appointments Today', component: 'AppointmentsToday', icon: <FiCalendar className="text-green-500" /> },
-    { name: 'Appointments This Week', component: 'AppointmentsThisWeek', icon: <FiCalendar className="text-purple-500" /> },
-    { name: 'Missed Appointments', component: 'MissedAppointments', icon: <FiAlertCircle className="text-red-500" /> },
-    { name: 'Add Patient', component: 'AddPatient', icon: <FaUserPlus className="text-red-500" /> },
-    { name: 'Add Visit', component: 'AddVisit', icon: <FaCalendarPlus className="text-sky-500" /> },
-
-    { name: 'Search Patient', component: 'SearchPatient', icon: <FaSearch className="text-blue-500" /> },
-    { name: 'Update Profile', component: 'UpdateProfile', icon: <FaUserEdit className="text-green-500" /> },
-    { name: 'Patients with Balance', component: 'PatientBalance', icon: <FaMoneyBillAlt className="text-yellow-500" /> },
+    {
+      name: 'Dashboard',
+      component: 'Dashboard',
+      icon: <FaChartBar className="text-indigo-500" />,
+    },
+    {
+      name: 'Ongoing Patients',
+      component: 'OngoingPatients',
+      icon: <FiClipboard className="text-blue-500" />,
+    },
+    {
+      name: 'Appointments Today',
+      component: 'AppointmentsToday',
+      icon: <FiCalendar className="text-green-500" />,
+    },
+    {
+      name: 'Appointments This Week',
+      component: 'AppointmentsThisWeek',
+      icon: <FaCalendarCheck className="text-purple-500" />,
+    },
+    {
+      name: 'Missed Appointments',
+      component: 'MissedAppointments',
+      icon: <FiAlertCircle className="text-red-500" />,
+    },
+    {
+      name: 'Add Patient',
+      component: 'AddPatient',
+      icon: <FaUserPlus className="text-red-500" />,
+    },
+    {
+      name: 'Add Visit',
+      component: 'AddVisit',
+      icon: <FaCalendarPlus className="text-sky-500" />,
+    },
+    {
+      name: 'Search Patient',
+      component: 'SearchPatient',
+      icon: <FaSearch className="text-blue-500" />,
+    },
+    {
+      name: 'Update Profile',
+      component: 'UpdateProfile',
+      icon: <FaUserEdit className="text-green-500" />,
+    },
+    {
+      name: 'Patients with Balance',
+      component: 'PatientBalance',
+      icon: <FaMoneyBillAlt className="text-yellow-500" />,
+    },
   ];
 
   return (
     <>
       {/* Mobile Navbar */}
-      <div className="md:hidden flex items-center justify-between bg-white p-4 shadow">
+      <div className="md:hidden flex items-center justify-between bg-white p-4 shadow w-full fixed top-0 z-40">
         <h1 className="text-xl font-bold">Dashboard</h1>
         <button onClick={() => setIsOpen(!isOpen)}>
           <svg
@@ -66,9 +104,11 @@ const Sidebar = ({ onMenuItemClick, activeItem }) => {
       <div
         className={`bg-white text-gray-800 w-64 space-y-2 py-7 px-2 absolute inset-y-0 left-0 transform ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:relative md:translate-x-0 transition duration-200 ease-in-out shadow-lg`}
+        } md:relative md:translate-x-0 transition duration-200 ease-in-out shadow-lg z-50`}
+        style={{ flexShrink: 0 }}
       >
         <nav className="flex flex-col h-full">
+          {/* Remove the extra close button here */}
           {menuItems.map((item, idx) => (
             <button
               key={idx}
@@ -87,7 +127,7 @@ const Sidebar = ({ onMenuItemClick, activeItem }) => {
             </button>
           ))}
 
-          {/* Home Button (Just Above Logout) */}
+          {/* Home and Logout Buttons */}
           <div className="mt-auto">
             <button
               onClick={() => {
