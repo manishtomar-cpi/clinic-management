@@ -1,6 +1,6 @@
 // pages/index.js
 "use client";
-import React from 'react';
+import React from "react";
 import {
   FaUserMd,
   FaNotesMedical,
@@ -15,30 +15,33 @@ import {
   FaUserCheck,
   FaLock,
   FaArrowRight,
-} from 'react-icons/fa';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+} from "react-icons/fa";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 const Home = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
 
   const handleLoginClick = () => {
-    if (status === 'authenticated') {
-      router.push('/dashboard');
+    if (status === "authenticated") {
+      router.push("/dashboard");
     } else {
-      router.push('/login');
+      router.push("/login");
     }
   };
 
   const handleSignupClick = () => {
-    if (status === 'authenticated') {
-      router.push('/dashboard');
+    if (status === "authenticated") {
+      router.push("/dashboard");
     } else {
-      router.push('/signup');
+      router.push("/signup");
     }
   };
 
+  const handleuserGuideClick = () => {
+    router.push("/user-guide");
+  };
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Hero Section */}
@@ -50,20 +53,29 @@ const Home = () => {
               Welcome to ClinicEase
             </h1>
             <p className="text-lg md:text-2xl mb-6 animate-fadeInUp">
-              A comprehensive solution for doctors to streamline clinic operations and enhance patient care.
+              A comprehensive solution for doctors to streamline clinic
+              operations and enhance patient care.
             </p>
-            <div className="flex space-x-4">
-              <button
-                onClick={handleSignupClick}
-                className="bg-white text-blue-600 py-3 px-6 rounded-lg text-lg font-medium hover:bg-gray-100 transition duration-300 shadow-lg animate-fadeInLeft"
-              >
-                Get Started
-              </button>
+            <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
+              <div className="flex space-x-4">
+                <button
+                  onClick={handleuserGuideClick}
+                  className="w-full md:w-40 bg-white text-blue-600 py-3 px-6 rounded-lg text-lg font-medium hover:bg-gray-100 transition duration-300 shadow-lg animate-fadeInLeft"
+                >
+                  User Guide
+                </button>
+                <button
+                  onClick={handleSignupClick}
+                  className="w-full md:w-40 bg-white text-blue-600 py-3 px-6 rounded-lg text-lg font-medium hover:bg-gray-100 transition duration-300 shadow-lg animate-fadeInLeft"
+                >
+                  Get Started
+                </button>
+              </div>
               <button
                 onClick={handleLoginClick}
-                className="bg-transparent border border-white py-3 px-6 rounded-lg text-lg font-medium hover:bg-white hover:text-blue-600 transition duration-300 shadow-lg animate-fadeInRight"
+                className="w-full md:w-40 bg-transparent border border-white py-3 px-6 rounded-lg text-lg font-medium hover:bg-white hover:text-blue-600 transition duration-300 shadow-lg animate-fadeInRight"
               >
-                {status === 'authenticated' ? 'Dashboard' : 'Login'}
+                {status === "authenticated" ? "Dashboard" : "Login"}
               </button>
             </div>
           </div>
@@ -85,7 +97,8 @@ const Home = () => {
             Empowering Clinics Across the Globe
           </h2>
           <p className="text-lg md:text-xl text-gray-600">
-            Join a community of doctors transforming patient care with efficient clinic management.
+            Join a community of doctors transforming patient care with efficient
+            clinic management.
           </p>
         </section>
 
@@ -98,7 +111,8 @@ const Home = () => {
               Multi-Clinic Management
             </h3>
             <p className="mt-2 text-gray-600 text-center">
-              Manage multiple clinics seamlessly, track performances, and coordinate across locations.
+              Manage multiple clinics seamlessly, track performances, and
+              coordinate across locations.
             </p>
           </div>
 
@@ -109,7 +123,8 @@ const Home = () => {
               Patient Records
             </h3>
             <p className="mt-2 text-gray-600 text-center">
-              Maintain comprehensive patient profiles with medical history, treatments, and visit summaries.
+              Maintain comprehensive patient profiles with medical history,
+              treatments, and visit summaries.
             </p>
           </div>
 
@@ -120,7 +135,8 @@ const Home = () => {
               Appointment Scheduling
             </h3>
             <p className="mt-2 text-gray-600 text-center">
-              Efficiently schedule appointments, send reminders, and reduce no-shows with ease.
+              Efficiently schedule appointments, send reminders, and reduce
+              no-shows with ease.
             </p>
           </div>
 
@@ -131,7 +147,8 @@ const Home = () => {
               Visit Documentation
             </h3>
             <p className="mt-2 text-gray-600 text-center">
-              Document patient visits thoroughly with notes, prescriptions, and follow-up plans.
+              Document patient visits thoroughly with notes, prescriptions, and
+              follow-up plans.
             </p>
           </div>
 
@@ -142,7 +159,8 @@ const Home = () => {
               Advanced Search
             </h3>
             <p className="mt-2 text-gray-600 text-center">
-              Quickly find patient records, appointments, and clinic data with powerful search tools.
+              Quickly find patient records, appointments, and clinic data with
+              powerful search tools.
             </p>
           </div>
 
@@ -233,13 +251,14 @@ const Home = () => {
             Ready to Transform Your Clinic?
           </h2>
           <p className="text-lg md:text-xl mb-8">
-            Sign up today and take the first step towards a more efficient practice.
+            Sign up today and take the first step towards a more efficient
+            practice.
           </p>
           <button
             onClick={handleSignupClick}
             className="bg-white text-blue-600 py-3 px-8 rounded-lg text-lg font-medium hover:bg-gray-100 transition duration-300 shadow-lg"
           >
-            {status === 'authenticated' ? 'Go to Dashboard' : 'Get Started Now'}
+            {status === "authenticated" ? "Go to Dashboard" : "Get Started Now"}
           </button>
         </div>
       </section>
