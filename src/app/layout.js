@@ -23,8 +23,8 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <Head>
-        <title>Clinic Management App</title>
-        <meta name="description" content="A Next.js application for clinic management" />
+        <title>ClinicEase</title>
+        <meta name="description" content="A comprehensive solution for doctors to streamline clinic operations and enhance patient care." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <body
