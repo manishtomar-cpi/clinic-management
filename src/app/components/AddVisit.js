@@ -20,6 +20,13 @@ import { showToast } from './Toast';
 import Select from 'react-select';
 import { FaNotesMedical } from 'react-icons/fa';
 
+// Helper function to format dates from 'yyyy-mm-dd' to 'dd-mm-yy'
+const formatDateForStorage = (dateStr) => {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  return `${day}-${month}-${year}`;
+};
+
 const AddVisit = () => {
   const { data: session } = useSession();
   const [step, setStep] = useState(1);
@@ -27,12 +34,14 @@ const AddVisit = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [visitData, setVisitData] = useState({
     visitDate: '',
+    visitTime: '', // Added
     visitReason: '',
     symptoms: '',
     diagnosis: '',
     medicineGiven: '',
     treatmentStatus: '',
     nextVisitDate: '',
+    nextVisitTime: '', // Added
     totalAmount: '',
     amountPaid: '',
     notes: '',
@@ -88,7 +97,7 @@ const AddVisit = () => {
           disease: decryptData(patientData.disease),
           address: decryptData(patientData.address),
           mobileNumber: decryptData(patientData.mobileNumber),
-          treatmentStatus: decryptData(patientData.treatmentStatus || ''),
+          treatmentStatus: patientData.treatmentStatus || '',
         });
       } else {
         console.error('No such patient document!');
@@ -120,12 +129,13 @@ const AddVisit = () => {
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         const visit = {
-          visitDate: decryptData(data.visitDate),
-          medicineGiven: decryptData(data.medicineGiven),
-          totalAmount: parseFloat(decryptData(data.totalAmount) || '0'),
-          amountPaid: parseFloat(decryptData(data.amountPaid) || '0'),
-          nextVisitDate: decryptData(data.nextVisitDate),
-          treatmentStatus: decryptData(data.treatmentStatus || ''),
+          visitDate: data.visitDate, // Already formatted
+          visitTime: data.visitTime,
+          totalAmount: parseFloat(data.totalAmount || '0'),
+          amountPaid: parseFloat(data.amountPaid || '0'),
+          nextVisitDate: data.nextVisitDate, // Already formatted
+          nextVisitTime: data.nextVisitTime,
+          treatmentStatus: data.treatmentStatus || '',
         };
         totalAmount += visit.totalAmount;
         totalPaid += visit.amountPaid;
@@ -150,11 +160,12 @@ const AddVisit = () => {
       [name]: '',
     });
 
-    // Disable next visit date if treatment status is 'Completed'
+    // Disable next visit date and time if treatment status is 'Completed'
     if (name === 'treatmentStatus' && value === 'Completed') {
       setVisitData((prevData) => ({
         ...prevData,
         nextVisitDate: '',
+        nextVisitTime: '',
       }));
     }
   };
@@ -171,6 +182,10 @@ const AddVisit = () => {
     } else if (step === 2) {
       if (!visitData.visitDate) {
         newErrors.visitDate = 'Visit date is required';
+        valid = false;
+      }
+      if (!visitData.visitTime) {
+        newErrors.visitTime = 'Visit time is required';
         valid = false;
       }
       if (!visitData.visitReason.trim()) {
@@ -191,6 +206,13 @@ const AddVisit = () => {
         !visitData.nextVisitDate
       ) {
         newErrors.nextVisitDate = 'Next visit date is required';
+        valid = false;
+      }
+      if (
+        visitData.treatmentStatus !== 'Completed' &&
+        !visitData.nextVisitTime
+      ) {
+        newErrors.nextVisitTime = 'Next visit time is required';
         valid = false;
       }
       if (!visitData.totalAmount) {
@@ -234,19 +256,41 @@ const AddVisit = () => {
       return;
     }
 
-    const encryptedData = {};
+    // Prepare data to store
+    const dataToStore = {};
+    // Fields to store unencrypted
+    const plaintextFields = [
+      'treatmentStatus',
+      'visitDate',
+      'visitTime',
+      'nextVisitDate',
+      'nextVisitTime',
+      'totalAmount',
+      'amountPaid',
+      'visitReason',
+    ];
+    // Encrypt the rest
     for (const key in visitData) {
-      encryptedData[key] = encryptData(visitData[key]);
+      if (plaintextFields.includes(key)) {
+        if (key === 'visitDate' || key === 'nextVisitDate') {
+          dataToStore[key] = formatDateForStorage(visitData[key]);
+        } else {
+          dataToStore[key] = visitData[key];
+        }
+      } else {
+        dataToStore[key] = encryptData(visitData[key]);
+      }
     }
 
     try {
       const doctorId = session.user.id;
       const patientId = selectedPatient.value;
 
+      // Add the visit to the patient's visits collection
       await addDoc(
         collection(db, 'doctors', doctorId, 'patients', patientId, 'visits'),
         {
-          ...encryptedData,
+          ...dataToStore,
           createdAt: new Date(),
         }
       );
@@ -254,18 +298,21 @@ const AddVisit = () => {
       // Update patient's treatment status in their main record
       const patientRef = doc(db, 'doctors', doctorId, 'patients', patientId);
       await updateDoc(patientRef, {
-        treatmentStatus: encryptData(visitData.treatmentStatus),
+        treatmentStatus: visitData.treatmentStatus, // Store as plaintext
       });
 
       showToast('Visit added successfully!', 'success');
+      // Reset form
       setVisitData({
         visitDate: '',
+        visitTime: '',
         visitReason: '',
         symptoms: '',
         diagnosis: '',
         medicineGiven: '',
         treatmentStatus: '',
         nextVisitDate: '',
+        nextVisitTime: '',
         totalAmount: '',
         amountPaid: '',
         notes: '',
@@ -395,8 +442,7 @@ const StepOne = ({
           <strong>Disease:</strong> {patientDetails.disease || 'N/A'}
         </p>
         <p>
-          <strong>Treatment Status:</strong>{' '}
-          {patientDetails.treatmentStatus || 'N/A'}
+          <strong>Treatment Status:</strong> {patientDetails.treatmentStatus || 'N/A'}
         </p>
         <p>
           <strong>Mobile Number:</strong> {patientDetails.mobileNumber || 'N/A'}
@@ -428,6 +474,15 @@ const StepTwo = ({ visitData, handleChange, nextStep, prevStep, errors }) => (
       value={visitData.visitDate}
       onChange={handleChange}
       error={errors.visitDate}
+      required
+    />
+    <InputField
+      label="Visit Time"
+      name="visitTime"
+      type="time"
+      value={visitData.visitTime}
+      onChange={handleChange}
+      error={errors.visitTime}
       required
     />
     <InputField
@@ -489,16 +544,28 @@ const StepThree = ({ visitData, handleChange, nextStep, prevStep, errors }) => (
       error={errors.treatmentStatus}
       required
     />
-    <InputField
-      label="Next Visit Date"
-      name="nextVisitDate"
-      type="date"
-      value={visitData.nextVisitDate}
-      onChange={handleChange}
-      error={errors.nextVisitDate}
-      disabled={visitData.treatmentStatus === 'Completed'}
-      required={visitData.treatmentStatus !== 'Completed'}
-    />
+    {visitData.treatmentStatus !== 'Completed' && (
+      <>
+        <InputField
+          label="Next Visit Date"
+          name="nextVisitDate"
+          type="date"
+          value={visitData.nextVisitDate}
+          onChange={handleChange}
+          error={errors.nextVisitDate}
+          required
+        />
+        <InputField
+          label="Next Visit Time"
+          name="nextVisitTime"
+          type="time"
+          value={visitData.nextVisitTime}
+          onChange={handleChange}
+          error={errors.nextVisitTime}
+          required
+        />
+      </>
+    )}
     <InputField
       label="Total Amount (₹)"
       name="totalAmount"
@@ -563,7 +630,10 @@ const StepFour = ({
         <strong>Treatment Status:</strong> {visitData.treatmentStatus}
       </p>
       <p>
-        <strong>Date:</strong> {visitData.visitDate}
+        <strong>Date:</strong> {formatDateForStorage(visitData.visitDate)}
+      </p>
+      <p>
+        <strong>Time:</strong> {visitData.visitTime}
       </p>
       <p>
         <strong>Reason for Visit:</strong> {visitData.visitReason}
@@ -583,7 +653,13 @@ const StepFour = ({
       </p>
       {visitData.nextVisitDate && (
         <p>
-          <strong>Next Visit Date:</strong> {visitData.nextVisitDate}
+          <strong>Next Visit Date:</strong>{' '}
+          {formatDateForStorage(visitData.nextVisitDate)}
+        </p>
+      )}
+      {visitData.nextVisitTime && (
+        <p>
+          <strong>Next Visit Time:</strong> {visitData.nextVisitTime}
         </p>
       )}
       {visitData.notes && (

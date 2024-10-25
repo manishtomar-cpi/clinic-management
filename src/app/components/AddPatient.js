@@ -88,7 +88,7 @@ const AddPatient = () => {
       return;
     }
 
-    // Encrypt the data
+    // Encrypt the sensitive data
     const encryptedData = {};
     for (const key in patientData) {
       encryptedData[key] = encryptData(patientData[key]);
@@ -98,6 +98,7 @@ const AddPatient = () => {
       const doctorId = session.user.id;
       await addDoc(collection(db, 'doctors', doctorId, 'patients'), {
         ...encryptedData,
+        treatmentStatus: 'Ongoing', // Store as plaintext
         createdAt: new Date(),
       });
       showToast('Patient added successfully!', 'success');
@@ -121,8 +122,7 @@ const AddPatient = () => {
 
   return (
     <div className="flex-1 flex items-center justify-center p-0 w-full">
-     <div className="bg-gradient-to-r from-blue-50 to-indigo-100 p-8 rounded-lg shadow-lg w-full sm:w-11/12 md:w-10/12 lg:w-full mt-10 lg:mt-0">
-
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-100 p-8 rounded-lg shadow-lg w-full sm:w-11/12 md:w-10/12 lg:w-full mt-10 lg:mt-0">
         <h2 className="text-3xl font-bold mb-6 text-center text-indigo-600">
           <FaUserPlus className="inline-block mb-1" /> Add New Patient
         </h2>
@@ -203,7 +203,11 @@ const StepOne = ({ patientData, handleChange, nextStep, errors }) => (
       tooltip="Select the patient's gender."
     />
     <div className="flex justify-end mt-6">
-      <button type="button" onClick={nextStep} className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700">
+      <button
+        type="button"
+        onClick={nextStep}
+        className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700"
+      >
         Next
       </button>
     </div>
@@ -239,10 +243,18 @@ const StepTwo = ({ patientData, handleChange, nextStep, prevStep, errors }) => (
       tooltip="Enter the patient's residential address."
     />
     <div className="flex justify-between mt-6">
-      <button type="button" onClick={prevStep} className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600">
+      <button
+        type="button"
+        onClick={prevStep}
+        className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600"
+      >
         Back
       </button>
-      <button type="button" onClick={nextStep} className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700">
+      <button
+        type="button"
+        onClick={nextStep}
+        className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700"
+      >
         Next
       </button>
     </div>
@@ -269,20 +281,51 @@ const StepThree = ({ patientData, handleChange, prevStep, handleSubmit, errors }
     />
     <div className="mt-6 p-4 bg-white rounded shadow">
       <h3 className="text-xl font-bold mb-2 text-indigo-600">Review Information</h3>
-      <p><strong>Name:</strong> {patientData.name}</p>
-      <p><strong>Age:</strong> {patientData.age}</p>
-      <p><strong>Gender:</strong> {patientData.gender}</p>
-      <p><strong>Mobile:</strong> {patientData.mobileNumber}</p>
-      {patientData.email && <p><strong>Email:</strong> {patientData.email}</p>}
-      {patientData.address && <p><strong>Address:</strong> {patientData.address}</p>}
-      {patientData.disease && <p><strong>Disease:</strong> {patientData.disease}</p>}
-      {patientData.notes && <p><strong>Notes:</strong> {patientData.notes}</p>}
+      <p>
+        <strong>Name:</strong> {patientData.name}
+      </p>
+      <p>
+        <strong>Age:</strong> {patientData.age}
+      </p>
+      <p>
+        <strong>Gender:</strong> {patientData.gender}
+      </p>
+      <p>
+        <strong>Mobile:</strong> {patientData.mobileNumber}
+      </p>
+      {patientData.email && (
+        <p>
+          <strong>Email:</strong> {patientData.email}
+        </p>
+      )}
+      {patientData.address && (
+        <p>
+          <strong>Address:</strong> {patientData.address}
+        </p>
+      )}
+      {patientData.disease && (
+        <p>
+          <strong>Disease:</strong> {patientData.disease}
+        </p>
+      )}
+      {patientData.notes && (
+        <p>
+          <strong>Notes:</strong> {patientData.notes}
+        </p>
+      )}
     </div>
     <div className="flex justify-between mt-6">
-      <button type="button" onClick={prevStep} className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600">
+      <button
+        type="button"
+        onClick={prevStep}
+        className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600"
+      >
         Back
       </button>
-      <button type="submit" className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700">
+      <button
+        type="submit"
+        className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700"
+      >
         Submit
       </button>
     </div>
@@ -297,7 +340,9 @@ const InputField = ({ label, error, tooltip, ...props }) => (
     </div>
     <input
       {...props}
-      className={`w-full p-3 border ${error ? 'border-red-500' : 'border-gray-300'} rounded focus:outline-none focus:ring-2 focus:ring-indigo-400`}
+      className={`w-full p-3 border ${
+        error ? 'border-red-500' : 'border-gray-300'
+      } rounded focus:outline-none focus:ring-2 focus:ring-indigo-400`}
     />
     {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
   </div>
@@ -311,7 +356,9 @@ const TextareaField = ({ label, error, tooltip, ...props }) => (
     </div>
     <textarea
       {...props}
-      className={`w-full p-3 border ${error ? 'border-red-500' : 'border-gray-300'} rounded focus:outline-none focus:ring-2 focus:ring-indigo-400`}
+      className={`w-full p-3 border ${
+        error ? 'border-red-500' : 'border-gray-300'
+      } rounded focus:outline-none focus:ring-2 focus:ring-indigo-400`}
     />
     {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
   </div>
@@ -328,7 +375,9 @@ const SelectField = ({ label, name, value, onChange, error, required, tooltip })
       value={value}
       onChange={onChange}
       required={required}
-      className={`w-full p-3 border ${error ? 'border-red-500' : 'border-gray-300'} rounded focus:outline-none focus:ring-2 focus:ring-indigo-400`}
+      className={`w-full p-3 border ${
+        error ? 'border-red-500' : 'border-gray-300'
+      } rounded focus:outline-none focus:ring-2 focus:ring-indigo-400`}
     >
       <option value="">Select Gender</option>
       <option value="Male">Male</option>

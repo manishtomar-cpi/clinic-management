@@ -11,11 +11,10 @@ import Tile from '../components/Tile';
 import {
   FiCalendar,
   FiAlertCircle,
-  FiDollarSign,
   FiUsers,
   FiClipboard,
 } from 'react-icons/fi';
-import { FaCalendarCheck } from 'react-icons/fa';
+import { FaCalendarCheck, FaRupeeSign } from 'react-icons/fa';
 
 import AddPatient from '../components/AddPatient';
 import SearchPatient from '../components/SearchPatient';
@@ -27,8 +26,9 @@ import AppointmentsThisWeek from '../components/AppointmentsThisWeek';
 import AddVisit from '../components/AddVisit';
 import MissedAppointments from '../components/MissedAppointments';
 import { decryptData } from '../../lib/encryption';
+
 import { db } from '../../db';
-import { collection, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import StatsChart from '../components/StatsChart';
 
 const DashboardPage = () => {
@@ -38,6 +38,7 @@ const DashboardPage = () => {
   const [doctorName, setDoctorName] = useState('');
   const [clinicName, setClinicName] = useState('');
   const [tileData, setTileData] = useState([]);
+  const [allVisits, setAllVisits] = useState([]); // Centralized state for all visits
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -49,7 +50,7 @@ const DashboardPage = () => {
         const decryptedClinicName = decryptData(session.user?.clinicName);
         setDoctorName(decryptedDoctorName);
         setClinicName(decryptedClinicName);
-  
+
         const unsubscribe = fetchDashboardData();
         return () => {
           if (unsubscribe) unsubscribe();
@@ -60,138 +61,168 @@ const DashboardPage = () => {
       }
     }
   }, [status, session, router]);
-  
 
   const fetchDashboardData = () => {
     const doctorId = session.user.id;
-
     const patientsRef = collection(db, 'doctors', doctorId, 'patients');
-    const unsubscribePatients = onSnapshot(patientsRef, async (patientsSnapshot) => {
-      const totalPatients = patientsSnapshot.size;
-      let ongoingTreatments = 0;
-      let outstandingBalance = 0;
 
-      const today = new Date();
-      let appointmentsToday = 0;
-      let appointmentsThisWeek = 0;
-      let missedAppointments = 0;
+    const unsubscribePatients = onSnapshot(patientsRef, (patientsSnapshot) => {
+      const patientIds = patientsSnapshot.docs.map(doc => doc.id);
 
-      const patientPromises = patientsSnapshot.docs.map(async (patientDoc) => {
-        const patientId = patientDoc.id;
-        const patientData = patientDoc.data();
-        const treatmentStatus = decryptData(patientData.treatmentStatus || '');
+      // Initialize visits state
+      setAllVisits([]);
 
-        if (treatmentStatus === 'Ongoing') {
-          ongoingTreatments += 1;
-        }
+      // Set up listeners for each patient's visits
+      const unsubscribeVisits = patientIds.map(patientId => {
+        const visitsRef = collection(db, 'doctors', doctorId, 'patients', patientId, 'visits');
 
-        const visitsRef = collection(
-          db,
-          'doctors',
-          doctorId,
-          'patients',
-          patientId,
-          'visits'
-        );
-        const visitsSnapshot = await getDocs(visitsRef);
+        return onSnapshot(visitsRef, (visitsSnapshot) => {
+          const visits = visitsSnapshot.docs.map(visitDoc => ({
+            id: visitDoc.id,
+            patientId,
+            ...visitDoc.data(),
+          }));
 
-        visitsSnapshot.forEach((visitDoc) => {
-          const visitData = visitDoc.data();
-
-          const totalAmount = parseFloat(decryptData(visitData.totalAmount) || '0');
-          const amountPaid = parseFloat(decryptData(visitData.amountPaid) || '0');
-          outstandingBalance += totalAmount - amountPaid;
-
-          const nextVisitDateStr = decryptData(visitData.nextVisitDate);
-          if (nextVisitDateStr) {
-            const nextVisitDate = new Date(nextVisitDateStr);
-            if (isSameDay(nextVisitDate, today)) {
-              appointmentsToday += 1;
-            }
-            if (isSameWeek(nextVisitDate, today)) {
-              appointmentsThisWeek += 1;
-            }
-            if (nextVisitDate < today && treatmentStatus !== 'Completed') {
-              missedAppointments += 1;
-            }
-          }
+          setAllVisits(prevVisits => {
+            // Remove old visits for this patient
+            const filteredVisits = prevVisits.filter(visit => visit.patientId !== patientId);
+            // Add updated visits
+            return [...filteredVisits, ...visits];
+          });
         });
       });
 
-      await Promise.all(patientPromises);
-
-      setTileData([
-        {
-          title: 'Total Patients',
-          count: totalPatients,
-          icon: <FiUsers className="text-blue-500" />,
-          color: 'border-blue-500',
-          description: 'Number of registered patients',
-          component: 'OngoingPatients',
-        },
-        {
-          title: 'Ongoing Treatments',
-          count: ongoingTreatments,
-          icon: <FiClipboard className="text-green-500" />,
-          color: 'border-green-500',
-          description: 'Patients currently under treatment',
-          component: 'OngoingPatients',
-        },
-        {
-          title: 'Appointments Today',
-          count: appointmentsToday,
-          icon: <FiCalendar className="text-purple-500" />,
-          color: 'border-purple-500',
-          description: 'Scheduled appointments for today',
-          component: 'AppointmentsToday',
-        },
-        {
-          title: 'Appointments This Week',
-          count: appointmentsThisWeek,
-          icon: <FaCalendarCheck className="text-teal-500" />,
-          color: 'border-teal-500',
-          description: 'Scheduled appointments for this week',
-          component: 'AppointmentsThisWeek',
-        },
-        {
-          title: 'Missed Appointments',
-          count: missedAppointments,
-          icon: <FiAlertCircle className="text-red-500" />,
-          color: 'border-red-500',
-          description: 'Missed appointments',
-          component: 'MissedAppointments',
-        },
-        {
-          title: 'Outstanding Balance (₹)',
-          count: outstandingBalance.toFixed(2),
-          icon: <FiDollarSign className="text-yellow-500" />,
-          color: 'border-yellow-500',
-          description: 'Total outstanding payments',
-          component: 'PatientBalance',
-        },
-      ]);
+      // Return a function to unsubscribe all visits listeners
+      return () => {
+        unsubscribeVisits.forEach(unsub => unsub());
+      };
     });
 
-    return () => {
-      unsubscribePatients();
-    };
+    return unsubscribePatients;
   };
 
-  const isSameDay = (date1, date2) => {
-    return (
-      date1.getFullYear() === date2.getFullYear() &&
-      date1.getMonth() === date2.getMonth() &&
-      date1.getDate() === date2.getDate()
-    );
-  };
+  useEffect(() => {
+    // Compute counts based on allVisits
+    let ongoingTreatments = 0;
+    let outstandingBalance = 0;
+    let appointmentsToday = 0;
+    let appointmentsThisWeek = 0;
+    let missedAppointmentsToday = 0;
 
-  const isSameWeek = (date1, date2) => {
-    const weekStart = new Date(date2);
-    weekStart.setDate(date2.getDate() - date2.getDay());
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    return date1 >= weekStart && date1 <= weekEnd;
-  };
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Start of the current week (Sunday)
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6); // End of the current week (Saturday)
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    // Extract unique patient IDs
+    const uniquePatientIds = new Set(allVisits.map(visit => visit.patientId));
+    const totalPatients = uniquePatientIds.size;
+
+    allVisits.forEach(visit => {
+      const treatmentStatus = decryptData(visit.treatmentStatus || '');
+      if (treatmentStatus === 'Ongoing') {
+        ongoingTreatments += 1;
+      }
+
+      const totalAmount = parseFloat(decryptData(visit.totalAmount) || '0');
+      const amountPaid = parseFloat(decryptData(visit.amountPaid) || '0');
+      outstandingBalance += totalAmount - amountPaid;
+
+      const nextVisitDateStr = decryptData(visit.nextVisitDate);
+      const nextVisitTimeStr = decryptData(visit.nextVisitTime);
+
+      if (nextVisitDateStr) {
+        const [day, month, year] = nextVisitDateStr.split('-').map(Number);
+        const nextVisitDate = new Date(year, month - 1, day);
+
+        // If next visit time is available, use it; otherwise, assume it's at the start of the day
+        if (nextVisitTimeStr) {
+          const [hours, minutes] = nextVisitTimeStr.split(':').map(Number);
+          nextVisitDate.setHours(hours, minutes, 0, 0);
+        } else {
+          nextVisitDate.setHours(0, 0, 0, 0);
+        }
+
+        // Check if the visit is today and missed
+        if (
+          nextVisitDate >= todayStart &&
+          nextVisitDate < now &&
+          treatmentStatus !== 'Completed'
+        ) {
+          missedAppointmentsToday += 1;
+        }
+
+        // Check if the visit is today for appointmentsToday count
+        if (nextVisitDate >= todayStart && nextVisitDate <= todayEnd) {
+          appointmentsToday += 1;
+        }
+
+        // Check if the visit is within this week
+        if (nextVisitDate >= startOfWeek && nextVisitDate <= endOfWeek) {
+          appointmentsThisWeek += 1;
+        }
+      }
+    });
+
+    setTileData([
+      {
+        title: 'Total Patients',
+        count: totalPatients,
+        icon: <FiUsers className="text-blue-500" />,
+        color: 'border-blue-500',
+        description: 'Number of registered patients',
+        component: 'OngoingPatients',
+      },
+      {
+        title: 'Ongoing Treatments',
+        count: ongoingTreatments,
+        icon: <FiClipboard className="text-green-500" />,
+        color: 'border-green-500',
+        description: 'Patients currently under treatment',
+        component: 'OngoingPatients',
+      },
+      {
+        title: 'Appointments Today',
+        count: appointmentsToday,
+        icon: <FiCalendar className="text-purple-500" />,
+        color: 'border-purple-500',
+        description: 'Scheduled appointments for today',
+        component: 'AppointmentsToday',
+      },
+      {
+        title: 'Appointments This Week',
+        count: appointmentsThisWeek,
+        icon: <FaCalendarCheck className="text-teal-500" />,
+        color: 'border-teal-500',
+        description: 'Scheduled appointments for this week',
+        component: 'AppointmentsThisWeek',
+      },
+      {
+        title: 'Missed Appointments Today',
+        count: missedAppointmentsToday,
+        icon: <FiAlertCircle className="text-red-500" />,
+        color: 'border-red-500',
+        description: 'Missed appointments for today',
+        component: 'MissedAppointments',
+      },
+      {
+        title: 'Outstanding Balance (₹)',
+        count: outstandingBalance.toFixed(2),
+        icon: <FaRupeeSign className="text-yellow-500" />,
+        color: 'border-yellow-500',
+        description: 'Total outstanding payments',
+        component: 'PatientBalance',
+      },
+    ]);
+  }, [allVisits]);
 
   if (status === 'loading') {
     return <div>Loading...</div>;
@@ -277,7 +308,6 @@ const DashboardPage = () => {
       <Sidebar onMenuItemClick={handleMenuItemClick} activeItem={activeContent} />
       <div className="flex-1 overflow-auto bg-gray-100">
         <div className="p-6">
-          {/* Removed the title display */}
           <div>{renderContent()}</div>
         </div>
       </div>

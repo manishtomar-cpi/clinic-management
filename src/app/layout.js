@@ -1,3 +1,5 @@
+// src/app/layout.js
+
 'use client';
 
 import localFont from "next/font/local";
@@ -29,7 +31,7 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-100`}
       >
         <SessionProvider>
-          {/* Toast component outside of main content for global access */}
+          {/* Render Toast once for global access */}
           <Toast />
 
           {/* You can add a Navbar component here when ready */}
