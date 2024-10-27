@@ -8,7 +8,7 @@ const SECRET_KEY = process.env.NEXT_PUBLIC_SECRET_KEY;
 if (!SECRET_KEY) {
   console.error('SECRET_KEY is not defined. Please set NEXT_PUBLIC_SECRET_KEY in your environment variables.');
 } else {
-  console.log('SECRET_KEY loaded successfully.');
+  // console.log('SECRET_KEY loaded successfully.');
 }
 
 export const encryptData = (data) => {

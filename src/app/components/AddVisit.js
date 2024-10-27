@@ -19,8 +19,9 @@ import { useSession } from 'next-auth/react';
 import { showToast } from './Toast';
 import Select from 'react-select';
 import { FaNotesMedical } from 'react-icons/fa';
+import { FaCheckCircle, FaTimesCircle, FaClock, FaHeartbeat } from 'react-icons/fa'; // Imported additional icons for Visit Status
 
-// Helper function to format dates from 'yyyy-mm-dd' to 'dd-mm-yy'
+// Helper function to format dates from 'yyyy-mm-dd' to 'dd-mm-yyyy'
 const formatDateForStorage = (dateStr) => {
   if (!dateStr) return '';
   const [year, month, day] = dateStr.split('-');
@@ -37,8 +38,7 @@ const AddVisit = () => {
     visitTime: '', // Added
     visitReason: '',
     symptoms: '',
-    diagnosis: '',
-    medicineGiven: '',
+    medicineGiven: '', // Renamed from 'diagnosis'
     treatmentStatus: '',
     nextVisitDate: '',
     nextVisitTime: '', // Added
@@ -73,6 +73,7 @@ const AddVisit = () => {
         setPatients(patientList);
       } catch (error) {
         console.error('Error fetching patients:', error);
+        showToast('Error fetching patients. Please try again later.', 'error');
       }
     };
     fetchPatients();
@@ -105,6 +106,7 @@ const AddVisit = () => {
       }
     } catch (error) {
       console.error('Error fetching patient details:', error);
+      showToast('Error fetching patient details.', 'error');
       setPatientDetails({});
     }
   };
@@ -136,6 +138,7 @@ const AddVisit = () => {
           nextVisitDate: data.nextVisitDate, // Already formatted
           nextVisitTime: data.nextVisitTime,
           treatmentStatus: data.treatmentStatus || '',
+          visitStatus: data.visitStatus || '', // Optional: Fetch existing visitStatus if any
         };
         totalAmount += visit.totalAmount;
         totalPaid += visit.amountPaid;
@@ -146,6 +149,7 @@ const AddVisit = () => {
       setRemainingBalance(totalAmount - totalPaid);
     } catch (error) {
       console.error('Error fetching visit history:', error);
+      showToast('Error fetching visit history.', 'error');
     }
   };
 
@@ -192,8 +196,8 @@ const AddVisit = () => {
         newErrors.visitReason = 'Please enter the reason for the visit';
         valid = false;
       }
-      if (!visitData.diagnosis.trim()) {
-        newErrors.diagnosis = 'Diagnosis is required';
+      if (!visitData.medicineGiven.trim()) { // Changed from 'diagnosis' to 'medicineGiven'
+        newErrors.medicineGiven = 'Medicine given is required';
         valid = false;
       }
     } else if (step === 3) {
@@ -227,6 +231,11 @@ const AddVisit = () => {
         valid = false;
       } else if (isNaN(visitData.amountPaid) || visitData.amountPaid < 0) {
         newErrors.amountPaid = 'Please enter a valid amount';
+        valid = false;
+      } else if (
+        parseFloat(visitData.amountPaid) > parseFloat(visitData.totalAmount)
+      ) {
+        newErrors.amountPaid = 'Amount paid cannot exceed total amount';
         valid = false;
       }
     }
@@ -282,6 +291,9 @@ const AddVisit = () => {
       }
     }
 
+    // **Added**: Automatically set visitStatus to 'Completed'
+    dataToStore['visitStatus'] = 'Completed';
+
     try {
       const doctorId = session.user.id;
       const patientId = selectedPatient.value;
@@ -308,8 +320,7 @@ const AddVisit = () => {
         visitTime: '',
         visitReason: '',
         symptoms: '',
-        diagnosis: '',
-        medicineGiven: '',
+        medicineGiven: '', // Reset 'medicineGiven'
         treatmentStatus: '',
         nextVisitDate: '',
         nextVisitTime: '',
@@ -330,7 +341,7 @@ const AddVisit = () => {
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-0">
       <div className="bg-gradient-to-r from-green-50 to-teal-100 p-8 rounded-lg shadow-lg w-full sm:w-11/12 md:w-10/12 lg:w-full mt-10 lg:mt-0 relative">
-        <h2 className="text-3xl font-bold mb-6 text-center text-teal-600">
+        <h2 className="text-3xl font-bold mb-6 text-teal-600">
           <FaNotesMedical className="inline-block mb-1" /> Add Patient Visit
         </h2>
         <ProgressBar step={step} />
@@ -500,12 +511,13 @@ const StepTwo = ({ visitData, handleChange, nextStep, prevStep, errors }) => (
       onChange={handleChange}
       error={errors.symptoms}
     />
-    <TextareaField
-      label="Diagnosis"
-      name="diagnosis"
-      value={visitData.diagnosis}
+    <InputField
+      label="Medicine Given"
+      name="medicineGiven" // Changed from 'diagnosis' to 'medicineGiven'
+      type="text"
+      value={visitData.medicineGiven}
       onChange={handleChange}
-      error={errors.diagnosis}
+      error={errors.medicineGiven}
       required
     />
     <div className="flex justify-between mt-6">
@@ -574,6 +586,7 @@ const StepThree = ({ visitData, handleChange, nextStep, prevStep, errors }) => (
       value={visitData.totalAmount}
       onChange={handleChange}
       error={errors.totalAmount}
+      required
     />
     <InputField
       label="Amount Paid (₹)"
@@ -583,6 +596,7 @@ const StepThree = ({ visitData, handleChange, nextStep, prevStep, errors }) => (
       value={visitData.amountPaid}
       onChange={handleChange}
       error={errors.amountPaid}
+      required
     />
     <TextareaField
       label="Additional Notes"
@@ -639,7 +653,10 @@ const StepFour = ({
         <strong>Reason for Visit:</strong> {visitData.visitReason}
       </p>
       <p>
-        <strong>Diagnosis:</strong> {visitData.diagnosis}
+        <strong>Medicine Given:</strong> {visitData.medicineGiven}
+      </p>
+      <p>
+        <strong>Visit Status:</strong> Completed {/* **Added** Visit Status */}
       </p>
       <p>
         <strong>Total Amount:</strong> ₹{visitData.totalAmount}

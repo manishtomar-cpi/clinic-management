@@ -4,7 +4,7 @@
 
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { showToast } from '../../app/components/Toast';
 import Sidebar from '../components/Sidebar';
 import Tile from '../components/Tile';
@@ -14,8 +14,7 @@ import {
   FiUsers,
   FiClipboard,
 } from 'react-icons/fi';
-import { FaCalendarCheck, FaRupeeSign } from 'react-icons/fa';
-
+import { FaCalendarCheck, FaRupeeSign, FaHeartbeat } from 'react-icons/fa';
 import AddPatient from '../components/AddPatient';
 import SearchPatient from '../components/SearchPatient';
 import UpdateProfile from '../components/UpdateProfile';
@@ -26,10 +25,18 @@ import AppointmentsThisWeek from '../components/AppointmentsThisWeek';
 import AddVisit from '../components/AddVisit';
 import MissedAppointments from '../components/MissedAppointments';
 import { decryptData } from '../../lib/encryption';
-
 import { db } from '../../db';
 import { collection, onSnapshot } from 'firebase/firestore';
 import StatsChart from '../components/StatsChart';
+
+// Spinner Component
+const MedicalSpinner = () => {
+  return (
+    <div className="flex justify-center items-center h-screen">
+      <FaHeartbeat className="animate-pulse text-red-500 text-6xl" />
+    </div>
+  );
+};
 
 const DashboardPage = () => {
   const { data: session, status } = useSession();
@@ -39,6 +46,7 @@ const DashboardPage = () => {
   const [clinicName, setClinicName] = useState('');
   const [tileData, setTileData] = useState([]);
   const [allVisits, setAllVisits] = useState([]); // Centralized state for all visits
+  const visitsListenersRef = useRef([]); // To store visits listeners
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -66,37 +74,61 @@ const DashboardPage = () => {
     const doctorId = session.user.id;
     const patientsRef = collection(db, 'doctors', doctorId, 'patients');
 
-    const unsubscribePatients = onSnapshot(patientsRef, (patientsSnapshot) => {
-      const patientIds = patientsSnapshot.docs.map(doc => doc.id);
+    const unsubscribePatients = onSnapshot(
+      patientsRef,
+      (patientsSnapshot) => {
+        const patientIds = patientsSnapshot.docs.map((doc) => doc.id);
 
-      // Initialize visits state
-      setAllVisits([]);
+        // Clean up existing visits listeners
+        visitsListenersRef.current.forEach((unsub) => unsub());
+        visitsListenersRef.current = [];
 
-      // Set up listeners for each patient's visits
-      const unsubscribeVisits = patientIds.map(patientId => {
-        const visitsRef = collection(db, 'doctors', doctorId, 'patients', patientId, 'visits');
+        // Reset allVisits
+        setAllVisits([]);
 
-        return onSnapshot(visitsRef, (visitsSnapshot) => {
-          const visits = visitsSnapshot.docs.map(visitDoc => ({
-            id: visitDoc.id,
+        // Set up listeners for each patient's visits
+        patientIds.forEach((patientId) => {
+          const visitsRef = collection(
+            db,
+            'doctors',
+            doctorId,
+            'patients',
             patientId,
-            ...visitDoc.data(),
-          }));
+            'visits'
+          );
 
-          setAllVisits(prevVisits => {
-            // Remove old visits for this patient
-            const filteredVisits = prevVisits.filter(visit => visit.patientId !== patientId);
-            // Add updated visits
-            return [...filteredVisits, ...visits];
-          });
+          const unsubscribeVisit = onSnapshot(
+            visitsRef,
+            (visitsSnapshot) => {
+              const visits = visitsSnapshot.docs.map((visitDoc) => ({
+                id: visitDoc.id,
+                patientId,
+                ...visitDoc.data(),
+              }));
+
+              setAllVisits((prevVisits) => {
+                // Remove old visits for this patient
+                const filteredVisits = prevVisits.filter(
+                  (visit) => visit.patientId !== patientId
+                );
+                // Add updated visits
+                return [...filteredVisits, ...visits];
+              });
+            },
+            (error) => {
+              console.error(`Error fetching visits for patient ${patientId}:`, error);
+              showToast(`Error fetching visits for patient ${patientId}.`, 'error');
+            }
+          );
+
+          visitsListenersRef.current.push(unsubscribeVisit);
         });
-      });
-
-      // Return a function to unsubscribe all visits listeners
-      return () => {
-        unsubscribeVisits.forEach(unsub => unsub());
-      };
-    });
+      },
+      (error) => {
+        console.error('Error fetching patients:', error);
+        showToast('Error fetching patients data. Please try again later.', 'error');
+      }
+    );
 
     return unsubscribePatients;
   };
@@ -123,21 +155,33 @@ const DashboardPage = () => {
     endOfWeek.setHours(23, 59, 59, 999);
 
     // Extract unique patient IDs
-    const uniquePatientIds = new Set(allVisits.map(visit => visit.patientId));
+    const uniquePatientIds = new Set(allVisits.map((visit) => visit.patientId));
     const totalPatients = uniquePatientIds.size;
 
-    allVisits.forEach(visit => {
-      const treatmentStatus = decryptData(visit.treatmentStatus || '');
+    allVisits.forEach((visit) => {
+      let treatmentStatus = '';
+      let totalAmount = 0;
+      let amountPaid = 0;
+      let nextVisitDateStr = '';
+      let nextVisitTimeStr = '';
+
+      try {
+        treatmentStatus = decryptData(visit.treatmentStatus || '');
+        totalAmount = parseFloat(decryptData(visit.totalAmount) || '0');
+        amountPaid = parseFloat(decryptData(visit.amountPaid) || '0');
+        nextVisitDateStr = decryptData(visit.nextVisitDate);
+        nextVisitTimeStr = decryptData(visit.nextVisitTime);
+      } catch (error) {
+        console.error('Decryption Error for visit:', visit.id, error);
+        // Optionally, show a toast or handle the error as needed
+        return; // Skip this visit if decryption fails
+      }
+
       if (treatmentStatus === 'Ongoing') {
         ongoingTreatments += 1;
       }
 
-      const totalAmount = parseFloat(decryptData(visit.totalAmount) || '0');
-      const amountPaid = parseFloat(decryptData(visit.amountPaid) || '0');
       outstandingBalance += totalAmount - amountPaid;
-
-      const nextVisitDateStr = decryptData(visit.nextVisitDate);
-      const nextVisitTimeStr = decryptData(visit.nextVisitTime);
 
       if (nextVisitDateStr) {
         const [day, month, year] = nextVisitDateStr.split('-').map(Number);
@@ -225,7 +269,7 @@ const DashboardPage = () => {
   }, [allVisits]);
 
   if (status === 'loading') {
-    return <div>Loading...</div>;
+    return <MedicalSpinner />;
   }
 
   if (!session) {
