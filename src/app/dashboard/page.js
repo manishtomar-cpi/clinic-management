@@ -278,8 +278,9 @@ const DashboardPage = () => {
 
   const handleLogout = async () => {
     showToast('You have successfully logged out!', 'success');
-    await signOut({ callbackUrl: process.env.NEXT_PUBLIC_HOST_URL || '/' });
+    await signOut({ callbackUrl: process.env.NEXTAUTH_URL || '/' });
   };
+  
 
   const handleTileClick = (component) => {
     setActiveContent(component);
