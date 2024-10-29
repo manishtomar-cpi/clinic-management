@@ -49,6 +49,7 @@ const AddVisit = () => {
   const [patientDetails, setPatientDetails] = useState({});
   const [remainingBalance, setRemainingBalance] = useState(0);
   const [visitHistory, setVisitHistory] = useState([]);
+  const [upcomingVisit, setUpcomingVisit] = useState(null); // New state for upcoming visit
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
@@ -79,10 +80,44 @@ const AddVisit = () => {
     fetchPatients();
   }, [session]);
 
+  // Fetch upcoming visit if exists
+  const fetchUpcomingVisit = async (patientId) => {
+    try {
+      const doctorId = session.user.id;
+      const visitsRef = collection(
+        db,
+        'doctors',
+        doctorId,
+        'patients',
+        patientId,
+        'visits'
+      );
+      const q = query(visitsRef, orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      let upcoming = null;
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.visitStatus === 'Upcoming') {
+          upcoming = {
+            id: doc.id,
+            ...data,
+          };
+        }
+      });
+
+      setUpcomingVisit(upcoming);
+    } catch (error) {
+      console.error('Error fetching upcoming visit:', error);
+      showToast('Error fetching upcoming visit.', 'error');
+    }
+  };
+
   const handlePatientChange = async (option) => {
     setSelectedPatient(option);
     await fetchVisitHistory(option.value);
     await fetchPatientDetails(option.value);
+    await fetchUpcomingVisit(option.value); // Fetch upcoming visit
     setErrors({ ...errors, selectedPatient: '' });
   };
 
@@ -131,6 +166,7 @@ const AddVisit = () => {
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         const visit = {
+          id: doc.id,
           visitDate: data.visitDate, // Already formatted
           visitTime: data.visitTime,
           totalAmount: parseFloat(data.totalAmount || '0'),
@@ -291,15 +327,15 @@ const AddVisit = () => {
       }
     }
 
-    // **Added**: Automatically set visitStatus to 'Completed'
+    // **Added**: Automatically set visitStatus to 'Completed' for current visit
     dataToStore['visitStatus'] = 'Completed';
 
     try {
       const doctorId = session.user.id;
       const patientId = selectedPatient.value;
 
-      // Add the visit to the patient's visits collection
-      await addDoc(
+      // Add the current visit to the patient's visits collection
+      const currentVisitRef = await addDoc(
         collection(db, 'doctors', doctorId, 'patients', patientId, 'visits'),
         {
           ...dataToStore,
@@ -312,6 +348,46 @@ const AddVisit = () => {
       await updateDoc(patientRef, {
         treatmentStatus: visitData.treatmentStatus, // Store as plaintext
       });
+
+      // Handle Upcoming Visit
+      if (visitData.nextVisitDate && visitData.nextVisitTime) {
+        if (upcomingVisit) {
+          // Update existing upcoming visit
+          const upcomingVisitRef = doc(
+            db,
+            'doctors',
+            doctorId,
+            'patients',
+            patientId,
+            'visits',
+            upcomingVisit.id
+          );
+          await updateDoc(upcomingVisitRef, {
+            nextVisitDate: formatDateForStorage(visitData.nextVisitDate),
+            nextVisitTime: visitData.nextVisitTime,
+            visitStatus: 'Upcoming',
+            createdAt: new Date(),
+          });
+        } else {
+          // Add new upcoming visit
+          await addDoc(
+            collection(
+              db,
+              'doctors',
+              doctorId,
+              'patients',
+              patientId,
+              'visits'
+            ),
+            {
+              visitDate: formatDateForStorage(visitData.nextVisitDate),
+              visitTime: visitData.nextVisitTime,
+              visitStatus: 'Upcoming',
+              createdAt: new Date(),
+            }
+          );
+        }
+      }
 
       showToast('Visit added successfully!', 'success');
       // Reset form
@@ -331,6 +407,7 @@ const AddVisit = () => {
       setStep(1);
       setSelectedPatient(null);
       setVisitHistory([]);
+      setUpcomingVisit(null);
       setRemainingBalance(0);
     } catch (error) {
       console.error('Error adding visit:', error);
@@ -355,6 +432,7 @@ const AddVisit = () => {
               nextStep={nextStep}
               errors={errors}
               patientDetails={patientDetails}
+              upcomingVisit={upcomingVisit} // Pass upcomingVisit
             />
           )}
           {step === 2 && (
@@ -373,6 +451,7 @@ const AddVisit = () => {
               nextStep={nextStep}
               prevStep={prevStep}
               errors={errors}
+              upcomingVisit={upcomingVisit} // Pass upcomingVisit if needed
             />
           )}
           {step === 4 && (
@@ -383,6 +462,7 @@ const AddVisit = () => {
               remainingBalance={remainingBalance}
               calculateNewBalance={calculateNewBalance}
               patientDetails={patientDetails}
+              upcomingVisit={upcomingVisit} // Pass upcomingVisit
             />
           )}
         </form>
@@ -414,6 +494,7 @@ const StepOne = ({
   nextStep,
   errors,
   patientDetails,
+  upcomingVisit,
 }) => (
   <>
     <div className="mb-6 relative">
@@ -461,6 +542,21 @@ const StepOne = ({
         <p>
           <strong>Address:</strong> {patientDetails.address || 'N/A'}
         </p>
+      </div>
+    )}
+    {upcomingVisit && (
+      <div className="mt-4 p-4 bg-yellow-100 rounded shadow">
+        <h3 className="text-lg font-semibold mb-2 text-yellow-700">Upcoming Visit</h3>
+        <p>
+          <strong>Date:</strong> {upcomingVisit.visitDate || 'N/A'}
+        </p>
+        <p>
+          <strong>Time:</strong> {upcomingVisit.visitTime || 'N/A'}
+        </p>
+        <p>
+          <strong>Status:</strong> {upcomingVisit.visitStatus || 'N/A'}
+        </p>
+        {/* Optionally, you can add a button or link to navigate to the upcoming visit details */}
       </div>
     )}
     <div className="flex justify-end mt-6">
@@ -540,7 +636,7 @@ const StepTwo = ({ visitData, handleChange, nextStep, prevStep, errors }) => (
 );
 
 // Step Three Component (Financial Details)
-const StepThree = ({ visitData, handleChange, nextStep, prevStep, errors }) => (
+const StepThree = ({ visitData, handleChange, nextStep, prevStep, errors, upcomingVisit }) => (
   <>
     <SelectField
       label="Treatment Status"
@@ -631,6 +727,7 @@ const StepFour = ({
   remainingBalance,
   calculateNewBalance,
   patientDetails,
+  upcomingVisit,
 }) => (
   <>
     <div className="mt-6 p-4 bg-white rounded shadow">
@@ -683,6 +780,23 @@ const StepFour = ({
         <p>
           <strong>Notes:</strong> {visitData.notes}
         </p>
+      )}
+      {upcomingVisit && (
+        <div className="mt-4 p-4 bg-yellow-100 rounded shadow">
+          <h3 className="text-lg font-semibold mb-2 text-yellow-700">Existing Upcoming Visit</h3>
+          <p>
+            <strong>Date:</strong> {upcomingVisit.visitDate || 'N/A'}
+          </p>
+          <p>
+            <strong>Time:</strong> {upcomingVisit.visitTime || 'N/A'}
+          </p>
+          <p>
+            <strong>Status:</strong> {upcomingVisit.visitStatus || 'N/A'}
+          </p>
+          <p>
+            <strong>Note:</strong> This upcoming visit will be updated with the new details provided above.
+          </p>
+        </div>
       )}
     </div>
     <div className="flex justify-between mt-6">

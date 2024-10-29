@@ -142,7 +142,7 @@ const Signup = () => {
 
       if (response.status === 201) {
         showToast('Signup successful!', 'success');
-        router.push('/dashboard'); // Redirect to dashboard after signup
+        router.push('/login'); // Redirect to dashboard after signup
       } else {
         showToast('Signup failed! Please try again.', 'error');
       }

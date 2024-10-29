@@ -9,78 +9,17 @@ import {
   onSnapshot, 
   doc, 
   updateDoc, 
-  getDocs, 
-  query, 
-  where, 
-  collectionGroup 
+  getDoc, 
 } from 'firebase/firestore';
 import { useSession } from 'next-auth/react';
-import { decryptData } from '../../lib/encryption'; // Ensure the path is correct
-import { 
-  FiAlertCircle, 
-  FiCalendar, 
-  FiClipboard, 
-  FiDollarSign, 
-  FiFileText, 
-  FiMapPin, 
-  FiMail, 
-  FiPhone, 
-  FiSearch 
-} from 'react-icons/fi';
+import { FiAlertCircle } from 'react-icons/fi';
 import { BsSearch } from 'react-icons/bs';
-import { 
-  FaCheckCircle, 
-  FaTimesCircle, 
-  FaClock, 
-  FaHeartbeat, 
-  FaMedkit, 
-  FaNotesMedical 
-} from 'react-icons/fa'; // Added FaNotesMedical
-import Modal from 'react-modal';
+import { FaCheckCircle, FaTimesCircle, FaClock, FaHeartbeat, FaMedkit } from 'react-icons/fa';
 import { motion } from 'framer-motion';
 import { showToast } from './Toast';
-import { TailSpin } from 'react-loader-spinner';
-
-// Reusable Function to Render Status Badges
-const renderStatusBadge = (status) => {
-  let colorClasses;
-  let Icon;
-
-  switch (status.toLowerCase()) {
-    case 'completed':
-      colorClasses = 'bg-green-100 text-green-800';
-      Icon = FaCheckCircle;
-      break;
-    case 'missed':
-      colorClasses = 'bg-red-100 text-red-800';
-      Icon = FaTimesCircle;
-      break;
-    case 'pending':
-      colorClasses = 'bg-yellow-100 text-yellow-800';
-      Icon = FaClock;
-      break;
-    case 'ongoing':
-      colorClasses = 'bg-blue-100 text-blue-800';
-      Icon = FaHeartbeat;
-      break;
-    case 'rescheduled':
-      colorClasses = 'bg-purple-100 text-purple-800';
-      Icon = FaMedkit;
-      break;
-    default:
-      colorClasses = 'bg-gray-100 text-gray-800';
-      Icon = FaClock;
-  }
-
-  return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${colorClasses}`}
-    >
-      <Icon className="mr-1 text-sm" />
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  );
-};
+import { TailSpin } from 'react-loader-spinner'; // For loading indicators
+import Modal from 'react-modal'; // If you intend to use modals
+import { decryptData } from '../../lib/encryption'; // Adjust the path based on your project structure
 
 // Custom Styles for Modal
 const customStyles = {
@@ -104,43 +43,35 @@ const customStyles = {
   },
 };
 
-// Custom hook to get window width
-const useWindowWidth = () => {
-  const [width, setWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
+// Helper function to categorize appointments based on visitDate and current date
+const categorizeAppointment = (appointment) => {
+  const visitDateStr = appointment.visitDate;
+  const now = new Date();
+  const [day, month, year] = visitDateStr.split('-').map(Number);
+  const visitDate = new Date(year, month - 1, day);
 
-  useEffect(() => {
-    const handleResize = () => setWidth(window.innerWidth);
-    if (typeof window !== 'undefined') {
-      window.addEventListener('resize', handleResize);
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('resize', handleResize);
-      }
-    };
-  }, []);
+  const diffTime = visitDate - now;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  return width;
+  if (diffDays === 0) return 'Today';
+  if (diffDays > 0 && diffDays <= 7) return 'This Week';
+  if (diffDays > 7 && diffDays <= 30) return 'This Month';
+  return 'All';
 };
 
 const AppointmentsToday = () => {
   const { data: session } = useSession();
   const [allAppointments, setAllAppointments] = useState([]); // Holds all appointments from Firestore
-  const [todayAppointments, setTodayAppointments] = useState([]); // Holds today's appointments
+  const [patientsMap, setPatientsMap] = useState({}); // Maps patientId to patientName
   const [searchTerm, setSearchTerm] = useState('');
   const [rescheduleData, setRescheduleData] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState('All');
+  const [selectedFilter, setSelectedFilter] = useState('All'); // Default filter
   const [displayedCount, setDisplayedCount] = useState(0);
+  const [todayAppointments, setTodayAppointments] = useState([]); // Appointments for today
   const loader = useRef(null);
-  const windowWidth = useWindowWidth();
-
-  // Memoize appointmentsPerLoad based on windowWidth
-  const appointmentsPerLoad = useMemo(() => {
-    if (windowWidth >= 1024) return 9; // Desktop
-    if (windowWidth >= 768) return 6;  // Tablet
-    return 3;                           // Mobile
-  }, [windowWidth]);
+  const appointmentsPerLoad = 6; // Fixed number of appointments to display initially
+  const visitsListenersRef = useRef([]); // To store visits listeners
 
   // Set the app element for React Modal
   useEffect(() => {
@@ -150,33 +81,100 @@ const AppointmentsToday = () => {
     }
   }, []);
 
-  // Firestore Listener: Listen to all visits using collectionGroup
+  // Fetch all patients and map patientId to patientName
+  useEffect(() => {
+    if (!session || !session.user || !session.user.id) {
+      console.log('No valid session found.');
+      return;
+    }
+
+    const doctorId = session.user.id;
+    const patientsRef = collection(db, 'doctors', doctorId, 'patients');
+
+    const unsubscribePatients = onSnapshot(
+      patientsRef,
+      (patientsSnapshot) => {
+        const patientData = {};
+        patientsSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          // Decrypt patient name if stored encrypted
+          const decryptedName = decryptData(data.name) || 'Unknown';
+          patientData[doc.id] = decryptedName;
+        });
+        setPatientsMap(patientData);
+
+        const patientIds = patientsSnapshot.docs.map((doc) => doc.id);
+        console.log('Patient IDs:', patientIds);
+
+        // Clean up existing visits listeners
+        visitsListenersRef.current.forEach((unsub) => unsub());
+        visitsListenersRef.current = [];
+
+        // Reset allAppointments
+        setAllAppointments([]);
+
+        // Set up listeners for each patient's visits
+        patientIds.forEach((patientId) => {
+          const visitsRef = collection(
+            db,
+            'doctors',
+            doctorId,
+            'patients',
+            patientId,
+            'visits'
+          );
+
+          const unsubscribeVisit = onSnapshot(
+            visitsRef,
+            (visitsSnapshot) => {
+              const visits = visitsSnapshot.docs.map((visitDoc) => {
+                const data = visitDoc.data();
+                return {
+                  id: visitDoc.id,
+                  patientId,
+                  // Decrypt patientName and visitReason if stored encrypted
+                  patientName: data.patientName ? decryptData(data.patientName) : patientData[patientId] || 'Unknown',
+                  visitReason: data.visitReason ? decryptData(data.visitReason) : 'N/A',
+                  ...data,
+                };
+              });
+
+              setAllAppointments((prevAppointments) => {
+                // Remove old visits for this patient
+                const filteredAppointments = prevAppointments.filter(
+                  (appt) => appt.patientId !== patientId
+                );
+                // Add updated visits
+                const updatedAppointments = [...filteredAppointments, ...visits];
+                return updatedAppointments;
+              });
+            },
+            (error) => {
+              console.error(`Error fetching visits for patient ${patientId}:`, error);
+              showToast(`Error fetching visits for patient ${patientId}.`, 'error');
+            }
+          );
+
+          visitsListenersRef.current.push(unsubscribeVisit);
+        });
+      },
+      (error) => {
+        console.error('Error fetching patients:', error);
+        showToast('Error fetching patients data. Please try again later.', 'error');
+      }
+    );
+
+    // Clean up on unmount
+    return () => {
+      unsubscribePatients();
+      visitsListenersRef.current.forEach((unsub) => unsub());
+    };
+  }, [session]);
+
+  // Filter appointments for today
   useEffect(() => {
     if (!session || !session.user || !session.user.id) return;
 
-    const doctorId = session.user.id;
-
-    // Assuming visits are stored under 'doctors/{doctorId}/patients/{patientId}/visits'
-    const visitsQuery = query(
-      collectionGroup(db, 'visits'),
-      where('doctorId', '==', doctorId) // Ensure that 'doctorId' is stored in each visit document
-    );
-
-    const unsubscribe = onSnapshot(visitsQuery, (snapshot) => {
-      const appointments = snapshot.docs.map(docSnap => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }));
-
-      setAllAppointments(appointments);
-    });
-
-    return () => unsubscribe();
-  }, [session]);
-
-  // Filter today's appointments and sort them
-  useEffect(() => {
-    // Filter today's appointments
     const now = new Date();
     const dd = String(now.getDate()).padStart(2, '0');
     const mm = String(now.getMonth() + 1).padStart(2, '0'); // Months are zero-based
@@ -184,87 +182,73 @@ const AppointmentsToday = () => {
     const todayDateStr = `${dd}-${mm}-${yyyy}`;
 
     const filteredAppointments = allAppointments.filter(appointment => {
-      const nextVisitDateStr = decryptData(appointment.nextVisitDate);
-      return nextVisitDateStr === todayDateStr;
+      const visitDateStr = appointment.visitDate;
+      return visitDateStr === todayDateStr;
     });
 
     // Sort appointments by time ascending
     filteredAppointments.sort((a, b) => {
-      const [hoursA, minutesA] = decryptData(a.nextVisitTime).split(':').map(Number);
-      const [hoursB, minutesB] = decryptData(b.nextVisitTime).split(':').map(Number);
+      const visitTimeA = a.visitTime;
+      const visitTimeB = b.visitTime;
+      if (!visitTimeA || !visitTimeB) return 0;
+
+      const [hoursA, minutesA] = visitTimeA.split(':').map(Number);
+      const [hoursB, minutesB] = visitTimeB.split(':').map(Number);
       return hoursA !== hoursB ? hoursA - hoursB : minutesA - minutesB;
     });
 
     setTodayAppointments(filteredAppointments);
     setDisplayedCount(Math.min(appointmentsPerLoad, filteredAppointments.length));
-  }, [allAppointments, appointmentsPerLoad]);
+  }, [allAppointments, appointmentsPerLoad, session]);
 
-  // Automatic Completion Logic
+  // Automatic Missed Status Logic
   useEffect(() => {
-    const checkAndUpdateAppointments = async () => {
+    const checkAndUpdateMissedAppointments = async () => {
       const now = new Date();
-      const todayDateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+      const yyyy = today.getFullYear();
+      const todayDateStr = `${dd}-${mm}-${yyyy}`;
 
       for (const appointment of todayAppointments) {
-        const visitStatusEncrypted = appointment.visitStatus;
-        const visitStatus = decryptData(visitStatusEncrypted) || 'Pending';
-        if (visitStatus.toLowerCase() !== 'pending') continue; // Only process pending appointments
+        const visitStatus = appointment.visitStatus || 'Pending';
+        if (visitStatus.toLowerCase() !== 'upcoming' && visitStatus.toLowerCase() !== 'pending') continue; // Only process upcoming or pending appointments
 
-        const nextVisitDateStr = decryptData(appointment.nextVisitDate) || '';
-        const nextVisitTimeStr = decryptData(appointment.nextVisitTime) || '';
+        const visitDateStr = appointment.visitDate || '';
+        const visitTimeStr = appointment.visitTime || '';
 
-        if (nextVisitDateStr !== todayDateStr) continue; // Ensure it's today
+        if (visitDateStr !== todayDateStr) continue; // Ensure it's today
 
         // Parse appointment datetime
-        const [day, month, year] = nextVisitDateStr.split('-').map(Number);
-        const [hours, minutes] = nextVisitTimeStr.split(':').map(Number);
+        const [day, month, year] = visitDateStr.split('-').map(Number);
+        const [hours, minutes] = visitTimeStr.split(':').map(Number);
         const appointmentDateTime = new Date(year, month - 1, day, hours, minutes);
 
         if (appointmentDateTime > now) continue; // Appointment time hasn't passed yet
 
-        // Check if patient has any previous completed visits
-        const doctorId = appointment.doctorId; // Ensure 'doctorId' is stored in visit document
-        const patientId = appointment.patientId; // Ensure 'patientId' is stored in visit document
-
-        if (!doctorId || !patientId) {
-          console.warn('Missing doctorId or patientId in appointment:', appointment);
-          continue;
-        }
-
-        const patientVisitsRef = collection(db, 'doctors', doctorId, 'patients', patientId, 'visits');
-        const previousVisitsQuery = query(
-          patientVisitsRef,
-          where('nextVisitDate', '<', todayDateStr),
-          where('visitStatus', '==', 'Completed')
-        );
-
-        const previousVisitsSnapshot = await getDocs(previousVisitsQuery);
-        const hasPreviousCompletedVisits = !previousVisitsSnapshot.empty;
-
-        if (hasPreviousCompletedVisits) {
-          // Automatically mark as 'Completed'
-          const visitRef = doc(db, 'doctors', doctorId, 'patients', patientId, 'visits', appointment.id);
-          await updateDoc(visitRef, {
-            treatmentStatus: 'Completed',
-            completedDate: formatDateForStorage(new Date()),
-            visitStatus: 'Completed',
-          });
-
-          showToast(`Appointment with ${decryptData(appointment.patientName)} marked as Completed.`, 'success');
-        }
+        // Mark as 'Missed'
+        await handleAction(appointment, 'missed');
       }
     };
 
     if (todayAppointments.length > 0) {
-      checkAndUpdateAppointments();
+      checkAndUpdateMissedAppointments();
     }
-  }, [todayAppointments]);
 
-  // Memoize filteredAppointments to avoid unnecessary computations
+    // Set interval to check every minute
+    const intervalId = setInterval(() => {
+      checkAndUpdateMissedAppointments();
+    }, 60000); // 60,000 ms = 1 minute
+
+    return () => clearInterval(intervalId);
+  }, [todayAppointments, session]);
+
+  // Filter appointments based on search term and selected filter using useMemo
   const filteredAppointments = useMemo(() => {
     return todayAppointments.filter((appointment) => {
       // Filter by search term
-      const patientName = decryptData(appointment.patientName) || '';
+      const patientName = appointment.patientName || 'Unknown';
       const matchesSearch = patientName.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Filter by selected category
@@ -275,6 +259,11 @@ const AppointmentsToday = () => {
       return matchesSearch && matchesFilter;
     });
   }, [todayAppointments, searchTerm, selectedFilter]);
+
+  // Adjust displayedCount based on filteredAppointments
+  useEffect(() => {
+    setDisplayedCount(Math.min(appointmentsPerLoad, filteredAppointments.length));
+  }, [filteredAppointments, appointmentsPerLoad]);
 
   // Infinite Scroll: Load more appointments when loader is visible
   useEffect(() => {
@@ -349,22 +338,22 @@ const AppointmentsToday = () => {
         updateObj = {
           treatmentStatus: 'Completed',
           completedDate: formatDateForStorage(new Date()),
-          visitStatus: 'Completed',
+          visitStatus: 'Completed', // Update visitStatus
         };
       } else if (action === 'missed') {
         updateObj = {
           treatmentStatus: 'Missed',
           missedDate: formatDateForStorage(new Date()),
-          visitStatus: 'Missed',
+          visitStatus: 'Missed', // Update visitStatus
         };
       }
 
       await updateDoc(visitRef, updateObj);
 
       if (action === 'done') {
-        showToast(`Appointment with ${decryptData(appointment.patientName)} marked as Completed!`, 'success');
+        showToast(`Appointment with ${appointment.patientName || 'Unknown'} marked as Completed!`, 'success');
       } else if (action === 'missed') {
-        showToast(`Appointment with ${decryptData(appointment.patientName)} marked as Missed!`, 'success');
+        showToast(`Appointment with ${appointment.patientName || 'Unknown'} marked as Missed!`, 'success');
       }
 
       // Update the appointment in the local state
@@ -378,12 +367,6 @@ const AppointmentsToday = () => {
             : appt
         )
       );
-
-      // Reset reschedule data if any
-      setRescheduleData((prev) => ({
-        ...prev,
-        [appointment.id]: {},
-      }));
     } catch (error) {
       console.error(`Error performing action '${action}' on appointment:`, error);
       showToast(`Error performing action. Please try again.`, 'error');
@@ -414,7 +397,7 @@ const AppointmentsToday = () => {
       );
 
       // Fetch the current visit data to ensure accurate updates
-      const visitDocSnap = await getDocs(visitRef);
+      const visitDocSnap = await getDoc(visitRef);
       if (!visitDocSnap.exists()) {
         showToast('Appointment does not exist.', 'error');
         setIsLoading(false);
@@ -430,10 +413,10 @@ const AppointmentsToday = () => {
       const isMissed = newDateObj.getTime() < Date.now();
 
       const updateObj = {
-        nextVisitDate: formatDateForStorage(newDateObj),
-        nextVisitTime: time, // Store time string directly
+        visitDate: formatDateForStorage(newDateObj), // Update visitDate to new date
+        visitTime: time, // Update visitTime to new time
         treatmentStatus: 'Ongoing', // Maintain as 'Ongoing'
-        visitStatus: 'Rescheduled', // Add or update 'visitStatus' to 'Rescheduled'
+        visitStatus: 'Rescheduled', // Update visitStatus to 'Rescheduled'
         missedDate: currentVisitData.missedDate || null, // Preserve original missed date if any
       };
 
@@ -478,52 +461,6 @@ const AppointmentsToday = () => {
     return categories;
   };
 
-  const categorizeAppointment = (appointment) => {
-    const [day, month, year] = decryptData(appointment.nextVisitDate).split('-').map(Number);
-    const [hours, minutes] = decryptData(appointment.nextVisitTime).split(':').map(Number);
-    const appointmentDate = new Date(year, month - 1, day, hours, minutes);
-    const now = new Date();
-
-    // Start of the week (Monday)
-    const startOfWeek = getStartOfWeek(now);
-    const endOfWeek = getEndOfWeek(now);
-
-    if (
-      appointmentDate.toDateString() === now.toDateString()
-    ) {
-      return 'Today';
-    } else if (
-      appointmentDate >= startOfWeek &&
-      appointmentDate <= endOfWeek
-    ) {
-      return 'This Week';
-    } else if (
-      appointmentDate.getMonth() === now.getMonth() &&
-      appointmentDate.getFullYear() === now.getFullYear()
-    ) {
-      return 'This Month';
-    } else {
-      return 'All';
-    }
-  };
-
-  const getStartOfWeek = (date) => {
-    const day = date.getDay(); // 0 (Sun) to 6 (Sat)
-    const diff = day === 0 ? -6 : 1 - day; // If Sunday, go back 6 days
-    const start = new Date(date);
-    start.setDate(date.getDate() + diff);
-    start.setHours(0, 0, 0, 0);
-    return start;
-  };
-
-  const getEndOfWeek = (date) => {
-    const start = getStartOfWeek(date);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-    return end;
-  };
-
   return (
     <div className="p-6">
       <div className="flex items-center mb-6">
@@ -555,6 +492,7 @@ const AppointmentsToday = () => {
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
+            aria-label={`Filter appointments by ${filter}`}
           >
             {filter}
           </button>
@@ -572,207 +510,210 @@ const AppointmentsToday = () => {
           />
         </div>
       ) : (
-        <>
-          {/* Appointments Today */}
-          <div className="bg-white p-6 rounded-xl shadow-lg mb-8">
-            <h3 className="text-2xl font-semibold mb-4 text-purple-800">
-              Appointments Today
-            </h3>
-            {filteredAppointments.length > 0 ? (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredAppointments.slice(0, displayedCount).map((appointment) => {
-                    const patientName = decryptData(appointment.patientName) || 'Unknown';
-                    const visitReason = decryptData(appointment.visitReason) || 'N/A';
-                    const visitStatus = decryptData(appointment.visitStatus) || 'Pending';
-                    const isMissed = visitStatus.toLowerCase() === 'missed';
-                    const isCompleted = visitStatus.toLowerCase() === 'completed';
-                    const isRescheduled = visitStatus.toLowerCase() === 'rescheduled';
-                    
-                    // Decrypt nextVisitDate and nextVisitTime
-                    const nextVisitDateStr = decryptData(appointment.nextVisitDate) || '';
-                    const nextVisitTimeStr = decryptData(appointment.nextVisitTime) || '';
-                    
-                    // Compute appointmentDateTime
-                    let appointmentDateTime = null;
-                    if (nextVisitDateStr && nextVisitTimeStr) {
-                      const [day, month, year] = nextVisitDateStr.split('-').map(Number);
-                      const [hours, minutes] = nextVisitTimeStr.split(':').map(Number);
-                      appointmentDateTime = new Date(year, month - 1, day, hours, minutes);
-                    }
-                    
-                    // Determine if the rescheduled appointment has been missed
-                    const missedAfterReschedule = isRescheduled && appointmentDateTime && appointmentDateTime < new Date();
+        <div className="bg-white p-6 rounded-xl shadow-lg mb-8">
+          <h3 className="text-2xl font-semibold mb-4 text-purple-800">
+            Appointments Today
+          </h3>
+          {filteredAppointments.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredAppointments.slice(0, displayedCount).map((appointment) => {
+                  const patientName = appointment.patientName || 'Unknown';
+                  const visitReason = appointment.visitReason || 'N/A';
+                  const visitStatus = appointment.visitStatus || 'Pending';
+                  const isMissed = visitStatus.toLowerCase() === 'missed';
+                  const isCompleted = visitStatus.toLowerCase() === 'completed';
+                  const isRescheduled = visitStatus.toLowerCase() === 'rescheduled';
+                  const isUpcoming = visitStatus.toLowerCase() === 'upcoming';
 
-                    return (
-                      <motion.div
-                        key={appointment.id}
-                        className="bg-gradient-to-r from-blue-100 to-blue-200 p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow relative"
-                        whileHover={{ scale: 1.02 }}
-                      >
-                        {/* Appointment Status Badge */}
-                        {isCompleted && (
-                          <span className="absolute top-2 right-2 bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded">
-                            Completed
-                          </span>
-                        )}
-                        {isMissed && (
-                          <span className="absolute top-2 right-2 bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded">
-                            Missed
-                          </span>
-                        )}
-                        {isRescheduled && (
-                          <span
-                            className={`absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded ${
-                              missedAfterReschedule
-                                ? 'bg-red-500 text-white'
-                                : 'bg-purple-500 text-white'
-                            }`}
-                          >
-                            {missedAfterReschedule ? 'Rescheduled but Missed' : 'Rescheduled'}
-                          </span>
-                        )}
-                        {!isCompleted && !isMissed && !isRescheduled && (
-                          <span className="absolute top-2 right-2 bg-gray-500 text-white text-xs font-semibold px-2 py-1 rounded">
-                            Pending
-                          </span>
-                        )}
+                  // visitDate and visitTime are plaintext
+                  const visitDateStr = appointment.visitDate || '';
+                  const visitTimeStr = appointment.visitTime || '';
 
-                        <h3 className="text-xl font-semibold mb-2">{patientName}</h3>
-                        <p>
-                          <strong>Time:</strong> {nextVisitTimeStr || 'N/A'}
-                        </p>
-                        <p>
-                          <strong>Reason:</strong> {visitReason}
-                        </p>
-                        {/* Display Rescheduled To if applicable */}
-                        {isRescheduled && (
-                          <p className={`mt-2 ${missedAfterReschedule ? 'text-red-700' : 'text-purple-700'}`}>
-                            Rescheduled to <strong>{nextVisitDateStr} at {nextVisitTimeStr}</strong>
-                          </p>
-                        )}
-                        {/* Action Buttons */}
-                        <div className="mt-4 flex justify-between">
-                          <button
-                            onClick={() => handleAction(appointment, 'done')}
-                            className={`bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl text-sm transition-colors duration-300 ${
-                              isMissed || isCompleted ? 'opacity-50 cursor-not-allowed' : ''
-                            }`}
-                            disabled={isMissed || isCompleted}
-                            aria-label={`Mark appointment with ${patientName} as Done`}
-                          >
-                            Done
-                          </button>
-                          <button
-                            onClick={() => handleAction(appointment, 'missed')}
-                            className={`bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm transition-colors duration-300 ${
-                              isMissed || isCompleted ? 'opacity-50 cursor-not-allowed' : ''
-                            }`}
-                            disabled={isMissed || isCompleted}
-                            aria-label={`Mark appointment with ${patientName} as Missed`}
-                          >
-                            Missed
-                          </button>
-                        </div>
-                        {/* Reschedule Inputs */}
-                        <div className="mt-4">
-                          <label className="block text-gray-700 mb-1">New Date:</label>
-                          <input
-                            type="date"
-                            value={rescheduleData[appointment.id]?.date || ''}
-                            onChange={(e) =>
-                              handleRescheduleChange(
-                                appointment.id,
-                                'date',
-                                e.target.value
-                              )
-                            }
-                            className={`w-full p-2 mb-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                              isMissed || isCompleted ? 'cursor-not-allowed opacity-50' : ''
-                            }`}
-                            aria-label={`Select new date for appointment with ${patientName}`}
-                            disabled={isMissed || isCompleted}
-                          />
+                  // Compute appointmentDateTime
+                  let appointmentDateTime = null;
+                  if (visitDateStr && visitTimeStr) {
+                    const [day, month, year] = visitDateStr.split('-').map(Number);
+                    const [hours, minutes] = visitTimeStr.split(':').map(Number);
+                    appointmentDateTime = new Date(year, month - 1, day, hours, minutes);
+                  }
 
-                          {/* Conditional Time Picker */}
-                          {rescheduleData[appointment.id]?.date && (
-                            <>
-                              <label className="block text-gray-700 mb-1">New Time:</label>
-                              <input
-                                type="time"
-                                value={rescheduleData[appointment.id]?.time || ''}
-                                onChange={(e) =>
-                                  handleRescheduleChange(
-                                    appointment.id,
-                                    'time',
-                                    e.target.value
-                                  )
-                                }
-                                className={`w-full p-2 mb-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                                  isMissed || isCompleted ? 'cursor-not-allowed opacity-50' : ''
-                                }`}
-                                aria-label={`Select new time for appointment with ${patientName}`}
-                                disabled={isMissed || isCompleted}
-                              />
-                            </>
-                          )}
-                        </div>
-                        {/* Reschedule Button */}
-                        <button
-                          onClick={() => handleReschedule(appointment)}
-                          className={`mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl text-sm transition-colors duration-300 flex items-center justify-center ${
-                            rescheduleData[appointment.id]?.date &&
-                            rescheduleData[appointment.id]?.time &&
-                            !isMissed &&
-                            !isCompleted
-                              ? ''
-                              : 'cursor-not-allowed opacity-50'
+                  // Determine if the rescheduled appointment has been missed
+                  const missedAfterReschedule = isRescheduled && appointmentDateTime && appointmentDateTime < new Date();
+
+                  return (
+                    <motion.div
+                      key={appointment.id}
+                      className="bg-gradient-to-r from-blue-100 to-blue-200 p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow relative"
+                      whileHover={{ scale: 1.02 }}
+                    >
+                      {/* Appointment Status Badge */}
+                      {isCompleted && (
+                        <span className="absolute top-2 right-2 bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded">
+                          Completed
+                        </span>
+                      )}
+                      {isMissed && (
+                        <span className="absolute top-2 right-2 bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded">
+                          Missed
+                        </span>
+                      )}
+                      {isRescheduled && (
+                        <span
+                          className={`absolute top-2 right-2 text-xs font-semibold px-2 py-1 rounded ${
+                            missedAfterReschedule
+                              ? 'bg-red-500 text-white'
+                              : 'bg-purple-500 text-white'
                           }`}
-                          disabled={
-                            !rescheduleData[appointment.id]?.date ||
-                            !rescheduleData[appointment.id]?.time ||
-                            isMissed ||
-                            isCompleted
-                          }
-                          aria-label={`Reschedule appointment with ${patientName}`}
                         >
-                          {rescheduleData[appointment.id]?.date &&
-                          rescheduleData[appointment.id]?.time ? (
-                            <>
-                              <span className="mr-2">Reschedule</span>
-                              {/* Simple SVG Icon */}
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4 4v5h.582m15.356 0A8.001 8.001 0 0112 21a8.001 8.001 0 01-7.938-6H4m16 0h-.541A8.002 8.002 0 0012 5a8.002 8.002 0 00-7.459 4H4"
-                                />
-                              </svg>
-                            </>
-                          ) : (
-                            'Reschedule'
-                          )}
-                        </button>
-                      </motion.div>
-                    );
-                  })}
-                </div>
+                          {missedAfterReschedule ? 'Rescheduled but Missed' : 'Rescheduled'}
+                        </span>
+                      )}
+                      {isUpcoming && (
+                        <span className="absolute top-2 right-2 bg-yellow-200 text-yellow-800 text-xs font-semibold px-2 py-1 rounded">
+                          Upcoming
+                        </span>
+                      )}
+                      {!isCompleted && !isMissed && !isRescheduled && !isUpcoming && (
+                        <span className="absolute top-2 right-2 bg-gray-500 text-white text-xs font-semibold px-2 py-1 rounded">
+                          Pending
+                        </span>
+                      )}
 
-                {/* Loader for infinite scroll */}
-                <div ref={loader} />
-              </>
-            ) : (
-              <p className="text-gray-600">No appointments found.</p>
-            )}
-          </div>
-        </>
+                      <h3 className="text-xl font-semibold mb-2">{patientName}</h3>
+                      <p>
+                        <strong>Time:</strong> {visitTimeStr || 'N/A'}
+                      </p>
+                      <p>
+                        <strong>Reason:</strong> {visitReason}
+                      </p>
+                      {/* Display Rescheduled To if applicable */}
+                      {isRescheduled && (
+                        <p className={`mt-2 ${missedAfterReschedule ? 'text-red-700' : 'text-purple-700'}`}>
+                          Rescheduled to <strong>{visitDateStr} at {visitTimeStr}</strong>
+                        </p>
+                      )}
+                      {/* Action Buttons */}
+                      <div className="mt-4 flex justify-between">
+                        <button
+                          onClick={() => handleAction(appointment, 'done')}
+                          className={`bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl text-sm transition-colors duration-300 ${
+                            isMissed || isCompleted ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                          disabled={isMissed || isCompleted}
+                          aria-label={`Mark appointment with ${patientName} as Done`}
+                        >
+                          Done
+                        </button>
+                        <button
+                          onClick={() => handleAction(appointment, 'missed')}
+                          className={`bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm transition-colors duration-300 ${
+                            isMissed || isCompleted ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                          disabled={isMissed || isCompleted}
+                          aria-label={`Mark appointment with ${patientName} as Missed`}
+                        >
+                          Missed
+                        </button>
+                      </div>
+                      {/* Reschedule Inputs */}
+                      <div className="mt-4">
+                        <label className="block text-gray-700 mb-1">New Date:</label>
+                        <input
+                          type="date"
+                          value={rescheduleData[appointment.id]?.date || ''}
+                          onChange={(e) =>
+                            handleRescheduleChange(
+                              appointment.id,
+                              'date',
+                              e.target.value
+                            )
+                          }
+                          className={`w-full p-2 mb-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                            isMissed || isCompleted ? 'cursor-not-allowed opacity-50' : ''
+                          }`}
+                          aria-label={`Select new date for appointment with ${patientName}`}
+                          disabled={isMissed || isCompleted}
+                        />
+
+                        {/* Conditional Time Picker */}
+                        {rescheduleData[appointment.id]?.date && (
+                          <>
+                            <label className="block text-gray-700 mb-1">New Time:</label>
+                            <input
+                              type="time"
+                              value={rescheduleData[appointment.id]?.time || ''}
+                              onChange={(e) =>
+                                handleRescheduleChange(
+                                  appointment.id,
+                                  'time',
+                                  e.target.value
+                                )
+                              }
+                              className={`w-full p-2 mb-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                                isMissed || isCompleted ? 'cursor-not-allowed opacity-50' : ''
+                              }`}
+                              aria-label={`Select new time for appointment with ${patientName}`}
+                              disabled={isMissed || isCompleted}
+                            />
+                          </>
+                        )}
+                      </div>
+                      {/* Reschedule Button */}
+                      <button
+                        onClick={() => handleReschedule(appointment)}
+                        className={`mt-2 w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl text-sm transition-colors duration-300 flex items-center justify-center ${
+                          rescheduleData[appointment.id]?.date &&
+                          rescheduleData[appointment.id]?.time &&
+                          !isMissed &&
+                          !isCompleted
+                            ? ''
+                            : 'cursor-not-allowed opacity-50'
+                        }`}
+                        disabled={
+                          !rescheduleData[appointment.id]?.date ||
+                          !rescheduleData[appointment.id]?.time ||
+                          isMissed ||
+                          isCompleted
+                        }
+                        aria-label={`Reschedule appointment with ${patientName}`}
+                      >
+                        {rescheduleData[appointment.id]?.date &&
+                        rescheduleData[appointment.id]?.time ? (
+                          <>
+                            <span className="mr-2">Reschedule</span>
+                            {/* Simple SVG Icon */}
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-5 w-5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 4v5h.582m15.356 0A8.001 8.001 0 0112 21a8.001 8.001 0 01-7.938-6H4m16 0h-.541A8.002 8.002 0 0012 5a8.002 8.002 0 00-7.459 4H4"
+                              />
+                            </svg>
+                          </>
+                        ) : (
+                          'Reschedule'
+                        )}
+                      </button>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Loader for infinite scroll */}
+              <div ref={loader} />
+            </>
+          ) : (
+            <p className="text-gray-600">No appointments found.</p>
+          )}
+        </div>
       )}
     </div>
   );
