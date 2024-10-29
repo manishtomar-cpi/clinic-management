@@ -290,7 +290,7 @@ const DashboardPage = () => {
     if (component === 'Logout') {
       handleLogout();
     } else if (component === 'Home') {
-      router.push('/');
+      router.push( process.env.NEXTAUTH_URL);
     } else {
       setActiveContent(component);
     }
