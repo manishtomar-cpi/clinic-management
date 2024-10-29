@@ -1,8 +1,16 @@
+// src/app/components/MissedAppointments.js
+
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { db } from '../../db';
-import { collection, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  updateDoc, 
+  getDoc 
+} from 'firebase/firestore';
 import { useSession } from 'next-auth/react';
 import { decryptData } from '../../lib/encryption';
 import { FiAlertCircle } from 'react-icons/fi';
@@ -32,7 +40,8 @@ const useWindowWidth = () => {
 
 const MissedAppointments = () => {
   const { data: session } = useSession();
-  const [missedAppointments, setMissedAppointments] = useState([]);
+  const [allAppointments, setAllAppointments] = useState([]); // Holds all appointments from Firestore
+  const [patientsMap, setPatientsMap] = useState({}); // Maps patientId to patientName
   const [searchTerm, setSearchTerm] = useState('');
   const [rescheduleData, setRescheduleData] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -40,249 +49,12 @@ const MissedAppointments = () => {
   const [displayedCount, setDisplayedCount] = useState(0);
   const loader = useRef(null);
   const windowWidth = useWindowWidth();
+  const visitsListenersRef = useRef([]); // To store visits listeners
 
-  // Determine appointments per load based on screen width
-  const getAppointmentsPerLoad = () => {
-    if (windowWidth >= 1024) return 9; // Desktop
-    if (windowWidth >= 768) return 6;  // Tablet
-    return 3;                           // Mobile
-  };
-
-  const appointmentsPerLoad = getAppointmentsPerLoad();
-
-  useEffect(() => {
-    if (!session || !session.user || !session.user.id) return;
-
-    const fetchMissedAppointments = async () => {
-      setIsLoading(true);
-      try {
-        const doctorId = session.user.id;
-        const patientsRef = collection(db, 'doctors', doctorId, 'patients');
-        const patientsSnapshot = await getDocs(patientsRef);
-
-        if (patientsSnapshot.empty) {
-          setMissedAppointments([]);
-          setDisplayedCount(0);
-          setIsLoading(false);
-          return;
-        }
-
-        const appointmentsData = [];
-        const now = new Date();
-        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-        for (const patientDoc of patientsSnapshot.docs) {
-          const patientId = patientDoc.id;
-          const patientData = patientDoc.data();
-          const patientName = decryptData(patientData.name);
-
-          const visitsRef = collection(
-            db,
-            'doctors',
-            doctorId,
-            'patients',
-            patientId,
-            'visits'
-          );
-
-          const visitsSnapshot = await getDocs(visitsRef);
-
-          visitsSnapshot.forEach((visitDoc) => {
-            const visitData = visitDoc.data();
-            const nextVisitDateStr = decryptData(visitData.nextVisitDate);
-            const nextVisitTimeStr = decryptData(visitData.nextVisitTime);
-            const treatmentStatus = visitData.treatmentStatus;
-            const visitStatus = visitData.visitStatus || 'Ongoing'; // Default to 'Ongoing' if not present
-
-            if (nextVisitDateStr && nextVisitTimeStr) {
-              const [day, month, year] = nextVisitDateStr.split('-').map(Number);
-              const [hours, minutes] = nextVisitTimeStr.split(':').map(Number);
-
-              if (
-                !isNaN(day) &&
-                !isNaN(month) &&
-                !isNaN(year) &&
-                !isNaN(hours) &&
-                !isNaN(minutes)
-              ) {
-                const nextVisitDateObj = new Date(year, month - 1, day, hours, minutes);
-                const nextVisitTimestamp = nextVisitDateObj.getTime();
-                const currentTimestamp = now.getTime();
-                const firstDayOfMonthTimestamp = firstDayOfMonth.getTime();
-
-                // Filter: Missed appointments within the current month
-                if (
-                  nextVisitTimestamp < currentTimestamp &&
-                  nextVisitTimestamp >= firstDayOfMonthTimestamp &&
-                  treatmentStatus !== 'Completed'
-                ) {
-                  // Determine if rescheduled and missed after reschedule
-                  let missedAfterReschedule = false;
-                  let rescheduledTo = null;
-
-                  if (visitStatus === 'Rescheduled') {
-                    const [resDay, resMonth, resYear] = nextVisitDateStr.split('-').map(Number);
-                    const [resHours, resMinutes] = nextVisitTimeStr.split(':').map(Number);
-                    const rescheduledDateObj = new Date(resYear, resMonth - 1, resDay, resHours, resMinutes);
-                    if (rescheduledDateObj.getTime() < currentTimestamp) {
-                      missedAfterReschedule = true;
-                    }
-                    rescheduledTo = `${nextVisitDateStr} at ${nextVisitTimeStr}`;
-                  }
-
-                  appointmentsData.push({
-                    id: visitDoc.id,
-                    patientId,
-                    patientName,
-                    nextVisitDate: nextVisitDateStr,
-                    nextVisitTime: nextVisitTimeStr,
-                    visitReason: visitData.visitReason,
-                    visitStatus,
-                    missedAfterReschedule,
-                    rescheduledTo,
-                  });
-                }
-              }
-            }
-          });
-        }
-
-        // Sort appointments by date descending
-        appointmentsData.sort((a, b) => {
-          const [dayA, monthA, yearA] = a.nextVisitDate.split('-').map(Number);
-          const [hoursA, minutesA] = a.nextVisitTime.split(':').map(Number);
-          const [dayB, monthB, yearB] = b.nextVisitDate.split('-').map(Number);
-          const [hoursB, minutesB] = b.nextVisitTime.split(':').map(Number);
-          const dateA = new Date(yearA, monthA - 1, dayA, hoursA, minutesA);
-          const dateB = new Date(yearB, monthB - 1, dayB, hoursB, minutesB);
-          return dateB - dateA;
-        });
-
-        setMissedAppointments(appointmentsData);
-        setDisplayedCount(Math.min(appointmentsPerLoad, appointmentsData.length));
-      } catch (error) {
-        console.error('Error fetching missed appointments:', error);
-        showToast('Error fetching missed appointments. Please try again.', 'error');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchMissedAppointments();
-  }, [session, appointmentsPerLoad]);
-
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
-  const handleFilterChange = (filter) => {
-    setSelectedFilter(filter);
-    setDisplayedCount(appointmentsPerLoad); // Reset displayed count when filter changes
-  };
-
-  const handleRescheduleChange = (appointmentId, field, value) => {
-    setRescheduleData((prev) => ({
-      ...prev,
-      [appointmentId]: {
-        ...prev[appointmentId],
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleReschedule = async (appointment) => {
-    const { date, time } = rescheduleData[appointment.id] || {};
-    if (!date || !time) {
-      showToast('Please select both a new date and time.', 'warning');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const doctorId = session.user.id;
-      const patientId = appointment.patientId;
-      const visitRef = doc(
-        db,
-        'doctors',
-        doctorId,
-        'patients',
-        patientId,
-        'visits',
-        appointment.id
-      );
-
-      // Fetch the current visit data to ensure accurate updates
-      const visitDocSnap = await getDoc(visitRef);
-      if (!visitDocSnap.exists()) {
-        showToast('Appointment does not exist.', 'error');
-        setIsLoading(false);
-        return;
-      }
-      const currentVisitData = visitDocSnap.data();
-
-      // Prepare the update object
-      const updateObj = {
-        nextVisitDate: formatDateForStorage(new Date(date)),
-        nextVisitTime: time, // Store time string directly
-        treatmentStatus: 'Ongoing', // Maintain as 'Ongoing'
-        visitStatus: 'Rescheduled', // Add or update 'visitStatus' to 'Rescheduled'
-        missedDate: currentVisitData.nextVisitDate, // Add 'missedDate'
-      };
-
-      await updateDoc(visitRef, updateObj);
-
-      showToast('Appointment rescheduled successfully!', 'success');
-
-      // Determine if rescheduled appointment has been missed
-      const [resDay, resMonth, resYear] = updateObj.nextVisitDate.split('-').map(Number);
-      const [resHours, resMinutes] = updateObj.nextVisitTime.split(':').map(Number);
-      const rescheduledDateObj = new Date(resYear, resMonth - 1, resDay, resHours, resMinutes);
-      const isMissed = rescheduledDateObj.getTime() < Date.now();
-
-      // Update the appointment in the local state
-      setMissedAppointments((prev) =>
-        prev.map((appt) =>
-          appt.id === appointment.id
-            ? {
-                ...appt,
-                nextVisitDate: updateObj.nextVisitDate,
-                nextVisitTime: updateObj.nextVisitTime,
-                visitStatus: updateObj.visitStatus,
-                missedAfterReschedule: isMissed,
-                rescheduledTo: `${updateObj.nextVisitDate} at ${updateObj.nextVisitTime}`,
-              }
-            : appt
-        )
-      );
-
-      // Reset reschedule data
-      setRescheduleData((prev) => ({
-        ...prev,
-        [appointment.id]: {},
-      }));
-    } catch (error) {
-      console.error('Error rescheduling appointment:', error);
-      showToast('Error rescheduling appointment. Please try again.', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const formatDateForStorage = (dateObj) => {
-    const dd = String(dateObj.getDate()).padStart(2, '0');
-    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-    const yyyy = String(dateObj.getFullYear());
-    return `${dd}-${mm}-${yyyy}`;
-  };
-
-  const getFilterCategories = () => {
-    const categories = ['All', 'Today', 'This Week', 'This Month'];
-    return categories;
-  };
-
+  // Categorize appointments based on visitDate and current date
   const categorizeAppointment = (appointment) => {
-    const [day, month, year] = appointment.nextVisitDate.split('-').map(Number);
-    const [hours, minutes] = appointment.nextVisitTime.split(':').map(Number);
+    const [day, month, year] = appointment.visitDate.split('-').map(Number);
+    const [hours, minutes] = appointment.visitTime.split(':').map(Number);
     const appointmentDate = new Date(year, month - 1, day, hours, minutes);
     const now = new Date();
 
@@ -312,19 +84,195 @@ const MissedAppointments = () => {
     }
   };
 
-  const filteredAppointments = missedAppointments.filter((appointment) => {
-    // Filter by search term
-    const matchesSearch = appointment.patientName
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
+  // Memoize filteredAppointments to optimize performance
+  const filteredAppointments = useMemo(() => {
+    return allAppointments.filter((appointment) => {
+      const patientName = appointment.patientName || 'Unknown';
+      const visitDateStr = appointment.visitDate || ''; // "DD-MM-YYYY"
+      const visitTimeStr = appointment.visitTime || ''; // "HH:MM"
+      const visitStatus = appointment.visitStatus || 'Ongoing'; // "Pending" | "Completed" | "Missed" | "Rescheduled"
 
-    // Filter by selected category
-    const category = categorizeAppointment(appointment);
-    const matchesFilter =
-      selectedFilter === 'All' || category === selectedFilter;
+      // Filter by search term
+      const lowerCaseName = patientName.toLowerCase();
+      const matchesSearch = lowerCaseName.includes(searchTerm.toLowerCase());
 
-    return matchesSearch && matchesFilter;
-  });
+      // Determine if the appointment is missed
+      const isMissed = visitStatus.toLowerCase() === 'missed';
+
+      // Determine if the appointment should be included based on status and date
+      let includeAppointment = false;
+
+      if (isMissed) {
+        includeAppointment = true; // Include all missed appointments
+      } else {
+        // Parse visitDate and visitTime to Date object
+        const [day, month, year] = visitDateStr.split('-').map(Number);
+        const [hours, minutes] = visitTimeStr.split(':').map(Number);
+        const appointmentDate = new Date(year, month - 1, day, hours, minutes);
+
+        // Include if the appointment date is before now and not completed
+        if (appointmentDate.getTime() < new Date().getTime() && visitStatus.toLowerCase() !== 'completed') {
+          includeAppointment = true;
+        }
+      }
+
+      // Further filter based on selected category
+      const category = categorizeAppointment(appointment);
+      const matchesFilter =
+        selectedFilter === 'All' || category === selectedFilter;
+
+      return matchesSearch && includeAppointment && matchesFilter;
+    });
+  }, [allAppointments, searchTerm, selectedFilter, categorizeAppointment]);
+
+  // Determine appointments per load based on screen width
+  const appointmentsPerLoad = useMemo(() => {
+    if (windowWidth >= 1024) return 9; // Desktop
+    if (windowWidth >= 768) return 6;  // Tablet
+    return 3;                           // Mobile
+  }, [windowWidth]);
+
+  // Fetch all patients and map patientId to patientName
+  useEffect(() => {
+    if (!session || !session.user || !session.user.id) {
+      console.log('No valid session found.');
+      return;
+    }
+
+    const doctorId = session.user.id;
+    console.log('Fetching patients for doctorId:', doctorId);
+
+    const patientsRef = collection(db, 'doctors', doctorId, 'patients');
+
+    const unsubscribePatients = onSnapshot(
+      patientsRef,
+      (patientsSnapshot) => {
+        const patientData = {};
+        patientsSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          // Adjust the field name as per your Firestore schema
+          const decryptedName = data.name ? decryptData(data.name) : 'Unknown';
+          patientData[doc.id] = decryptedName;
+        });
+        setPatientsMap(patientData);
+        console.log('Updated patientsMap:', patientData);
+
+        const patientIds = patientsSnapshot.docs.map((doc) => doc.id);
+        console.log('Patient IDs:', patientIds);
+
+        // Clean up existing visits listeners
+        visitsListenersRef.current.forEach((unsub) => unsub());
+        visitsListenersRef.current = [];
+
+        // Reset allAppointments
+        setAllAppointments([]);
+
+        // Set up listeners for each patient's visits
+        patientIds.forEach((patientId) => {
+          const visitsRef = collection(
+            db,
+            'doctors',
+            doctorId,
+            'patients',
+            patientId,
+            'visits'
+          );
+
+          const unsubscribeVisit = onSnapshot(
+            visitsRef,
+            (visitsSnapshot) => {
+              console.log(`Fetched ${visitsSnapshot.size} visits for patientId: ${patientId}`);
+              const visits = visitsSnapshot.docs.map((visitDoc) => {
+                const data = visitDoc.data();
+                // Decrypt visitReason if encrypted
+                let decryptedReason = 'N/A';
+                try {
+                  decryptedReason = data.visitReason ? decryptData(data.visitReason) : 'N/A';
+                } catch (error) {
+                  console.error(`Error decrypting visitReason for appointment ${visitDoc.id}:`, error);
+                }
+
+                return {
+                  id: visitDoc.id,
+                  patientId,
+                  ...data,
+                  // Use patientsMap to get patientName
+                  patientName: patientData[patientId] || 'Unknown',
+                  visitReason: decryptedReason,
+                };
+              });
+
+              setAllAppointments((prevAppointments) => {
+                // Remove old visits for this patient
+                const filteredAppointments = prevAppointments.filter(
+                  (appt) => appt.patientId !== patientId
+                );
+                // Add updated visits
+                const updatedAppointments = [...filteredAppointments, ...visits];
+                console.log('Updated allAppointments:', updatedAppointments);
+                return updatedAppointments;
+              });
+            },
+            (error) => {
+              console.error(`Error fetching visits for patient ${patientId}:`, error);
+              showToast(`Error fetching visits for patient ${patientId}.`, 'error');
+            }
+          );
+
+          visitsListenersRef.current.push(unsubscribeVisit);
+        });
+      },
+      (error) => {
+        console.error('Error fetching patients:', error);
+        showToast('Error fetching patients data. Please try again later.', 'error');
+      }
+    );
+
+    // Clean up on unmount
+    return () => {
+      unsubscribePatients();
+      visitsListenersRef.current.forEach((unsub) => unsub());
+    };
+  }, [session]);
+
+  // useEffect to set displayedCount when filteredAppointments change
+  useEffect(() => {
+    setDisplayedCount(Math.min(appointmentsPerLoad, filteredAppointments.length));
+  }, [filteredAppointments, appointmentsPerLoad]);
+
+  // Automatically mark appointments as missed if time has passed and status is 'Ongoing' or 'Pending'
+  useEffect(() => {
+    const checkMissedAppointments = async () => {
+      console.log('Checking for missed appointments.');
+      const now = new Date();
+
+      for (const appointment of allAppointments) {
+        const visitStatus = appointment.visitStatus.toLowerCase();
+
+        if (visitStatus === 'ongoing' || visitStatus === 'pending') {
+          const [day, month, year] = appointment.visitDate.split('-').map(Number);
+          const [hours, minutes] = appointment.visitTime.split(':').map(Number);
+          const appointmentDateTime = new Date(year, month - 1, day, hours, minutes);
+
+          if (appointmentDateTime < now) {
+            console.log(`Marking appointment ${appointment.id} as Missed.`);
+            await handleAction(appointment, 'missed');
+          }
+        }
+      }
+    };
+
+    if (allAppointments.length > 0) {
+      checkMissedAppointments();
+    }
+
+    // Set interval to check every minute
+    const intervalId = setInterval(() => {
+      checkMissedAppointments();
+    }, 60000); // 60,000 ms = 1 minute
+
+    return () => clearInterval(intervalId);
+  }, [allAppointments, session]);
 
   // Infinite Scroll: Load more appointments when loader is visible
   useEffect(() => {
@@ -334,9 +282,10 @@ const MissedAppointments = () => {
       threshold: 1.0,
     };
 
-    const observer = new IntersectionObserver((entities) => {
-      const target = entities[0];
+    const observer = new IntersectionObserver((entries) => {
+      const target = entries[0];
       if (target.isIntersecting) {
+        console.log('Loader is visible. Loading more appointments.');
         loadMore();
       }
     }, options);
@@ -354,8 +303,196 @@ const MissedAppointments = () => {
 
   const loadMore = () => {
     if (displayedCount < filteredAppointments.length) {
-      setDisplayedCount((prev) => Math.min(prev + appointmentsPerLoad, filteredAppointments.length));
+      setDisplayedCount((prev) => {
+        const newCount = Math.min(prev + appointmentsPerLoad, filteredAppointments.length);
+        console.log(`Loading more appointments. New displayedCount: ${newCount}`);
+        return newCount;
+      });
     }
+  };
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setDisplayedCount(appointmentsPerLoad); // Reset displayed count on new search
+    console.log('Search term updated:', e.target.value);
+  };
+
+  const handleFilterChange = (filter) => {
+    setSelectedFilter(filter);
+    setDisplayedCount(appointmentsPerLoad); // Reset displayed count when filter changes
+    console.log('Filter changed to:', filter);
+  };
+
+  const handleRescheduleChange = (appointmentId, field, value) => {
+    setRescheduleData((prev) => ({
+      ...prev,
+      [appointmentId]: {
+        ...prev[appointmentId],
+        [field]: value,
+      },
+    }));
+    console.log(`Reschedule data updated for appointment ${appointmentId}:`, field, value);
+  };
+
+  const handleAction = async (appointment, action) => {
+    try {
+      setIsLoading(true);
+      const doctorId = session.user.id;
+      const patientId = appointment.patientId;
+      const visitRef = doc(
+        db,
+        'doctors',
+        doctorId,
+        'patients',
+        patientId,
+        'visits',
+        appointment.id
+      );
+
+      let updateObj = {};
+
+      if (action === 'done') {
+        updateObj = {
+          treatmentStatus: 'Completed',
+          completedDate: formatDateForStorage(new Date()),
+          visitStatus: 'Completed', // Update visitStatus
+        };
+      } else if (action === 'missed') {
+        updateObj = {
+          treatmentStatus: 'Missed',
+          missedDate: formatDateForStorage(new Date()),
+          visitStatus: 'Missed', // Update visitStatus
+        };
+      }
+
+      await updateDoc(visitRef, updateObj);
+      console.log(`Appointment ${appointment.id} updated with action: ${action}`, updateObj);
+
+      if (action === 'done') {
+        showToast(`Appointment with ${appointment.patientName} marked as Completed!`, 'success');
+      } else if (action === 'missed') {
+        showToast(`Appointment with ${appointment.patientName} marked as Missed!`, 'success');
+      }
+
+      // Update the appointment in the local state
+      setAllAppointments((prev) =>
+        prev.map((appt) =>
+          appt.id === appointment.id
+            ? {
+                ...appt,
+                ...updateObj,
+              }
+            : appt
+        )
+      );
+      console.log(`Appointment ${appointment.id} state updated locally.`);
+    } catch (error) {
+      console.error(`Error performing action '${action}' on appointment:`, error);
+      showToast(`Error performing action. Please try again.`, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReschedule = async (appointment) => {
+    const { date, time } = rescheduleData[appointment.id] || {};
+    if (!date || !time) {
+      showToast('Please select both a new date and time.', 'warning');
+      console.log(`Reschedule attempted without complete data for appointment ${appointment.id}.`);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const doctorId = session.user.id;
+      const patientId = appointment.patientId;
+      const visitRef = doc(
+        db,
+        'doctors',
+        doctorId,
+        'patients',
+        patientId,
+        'visits',
+        appointment.id
+      );
+
+      // Fetch the current visit data to ensure accurate updates
+      const visitDocSnap = await getDoc(visitRef);
+      if (!visitDocSnap.exists()) {
+        showToast('Appointment does not exist.', 'error');
+        setIsLoading(false);
+        console.log(`Reschedule failed: Appointment ${appointment.id} does not exist.`);
+        return;
+      }
+      const currentVisitData = visitDocSnap.data();
+
+      // Prepare the update object
+      const newDateObj = new Date(date);
+      const [resHours, resMinutes] = time.split(':').map(Number);
+      newDateObj.setHours(resHours, resMinutes);
+
+      const isMissed = newDateObj.getTime() < Date.now();
+      console.log(`Rescheduling appointment ${appointment.id} to ${newDateObj}. Is missed: ${isMissed}`);
+
+      const updateObj = {
+        nextVisitDate: formatDateForStorage(newDateObj), // Update nextVisitDate to new date
+        nextVisitTime: time, // Update nextVisitTime to new time
+        treatmentStatus: 'Ongoing', // Maintain as 'Ongoing'
+        visitStatus: 'Rescheduled', // Update visitStatus to 'Rescheduled'
+        missedDate: currentVisitData.missedDate || null, // Preserve original missed date if any
+      };
+
+      await updateDoc(visitRef, updateObj);
+      console.log(`Appointment ${appointment.id} rescheduled with update:`, updateObj);
+
+      showToast('Appointment rescheduled successfully!', 'success');
+
+      // Determine if rescheduled appointment has been missed
+      const [resDay, resMonth, resYear] = updateObj.nextVisitDate.split('-').map(Number);
+      const [resHoursVal, resMinutesVal] = updateObj.nextVisitTime.split(':').map(Number);
+      const rescheduledDateObj = new Date(resYear, resMonth - 1, resDay, resHoursVal, resMinutesVal);
+      const isRescheduledMissed = rescheduledDateObj.getTime() < Date.now();
+
+      // Update the appointment in the local state
+      setAllAppointments((prev) =>
+        prev.map((appt) =>
+          appt.id === appointment.id
+            ? {
+                ...appt,
+                nextVisitDate: updateObj.nextVisitDate,
+                nextVisitTime: updateObj.nextVisitTime,
+                visitStatus: updateObj.visitStatus,
+                missedAfterReschedule: isRescheduledMissed,
+                rescheduledTo: `${updateObj.nextVisitDate} at ${updateObj.nextVisitTime}`,
+              }
+            : appt
+        )
+      );
+      console.log(`Appointment ${appointment.id} state updated locally after rescheduling.`);
+
+      // Reset reschedule data
+      setRescheduleData((prev) => ({
+        ...prev,
+        [appointment.id]: {},
+      }));
+    } catch (error) {
+      console.error('Error rescheduling appointment:', error);
+      showToast('Error rescheduling appointment. Please try again.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatDateForStorage = (dateObj) => {
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0'); // Months are zero-based
+    const yyyy = String(dateObj.getFullYear());
+    return `${dd}-${mm}-${yyyy}`;
+  };
+
+  const getFilterCategories = () => {
+    const categories = ['All', 'Today', 'This Week', 'This Month'];
+    return categories;
   };
 
   return (
@@ -373,6 +510,7 @@ const MissedAppointments = () => {
           value={searchTerm}
           onChange={handleSearch}
           className="w-full p-3 pl-10 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-red-400"
+          aria-label="Search Missed Appointments"
         />
         <BsSearch className="absolute left-4 top-3 text-gray-400" />
       </div>
@@ -388,6 +526,7 @@ const MissedAppointments = () => {
                 ? 'bg-red-500 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
+            aria-label={`Filter missed appointments by ${filter}`}
           >
             {filter}
           </button>
@@ -405,7 +544,7 @@ const MissedAppointments = () => {
           />
         </div>
       ) : filteredAppointments.length === 0 ? (
-        <p>No missed appointments.</p>
+        <p className="text-gray-600">No missed appointments.</p>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -430,10 +569,10 @@ const MissedAppointments = () => {
 
                 <h3 className="text-xl font-semibold mb-2">{appointment.patientName}</h3>
                 <p>
-                  <strong>Date:</strong> {appointment.nextVisitDate}
+                  <strong>Date:</strong> {appointment.visitDate}
                 </p>
                 <p>
-                  <strong>Time:</strong> {appointment.nextVisitTime}
+                  <strong>Time:</strong> {appointment.visitTime}
                 </p>
                 <p>
                   <strong>Reason:</strong> {appointment.visitReason}
@@ -456,7 +595,11 @@ const MissedAppointments = () => {
                         e.target.value
                       )
                     }
-                    className="w-full p-2 mb-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className={`w-full p-2 mb-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-400 ${
+                      appointment.visitStatus.toLowerCase() === 'missed' ? 'cursor-not-allowed opacity-50' : ''
+                    }`}
+                    aria-label={`Select new date for appointment with ${appointment.patientName}`}
+                    disabled={appointment.visitStatus.toLowerCase() === 'missed'}
                   />
 
                   {/* Conditional Time Picker */}
@@ -473,7 +616,11 @@ const MissedAppointments = () => {
                             e.target.value
                           )
                         }
-                        className="w-full p-2 mb-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-400"
+                        className={`w-full p-2 mb-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-400 ${
+                          appointment.visitStatus.toLowerCase() === 'missed' ? 'cursor-not-allowed opacity-50' : ''
+                        }`}
+                        aria-label={`Select new time for appointment with ${appointment.patientName}`}
+                        disabled={appointment.visitStatus.toLowerCase() === 'missed'}
                       />
                     </>
                   )}
@@ -482,14 +629,17 @@ const MissedAppointments = () => {
                     onClick={() => handleReschedule(appointment)}
                     className={`mt-2 py-2 px-4 rounded-full transition-colors duration-300 flex items-center justify-center ${
                       rescheduleData[appointment.id]?.date &&
-                      rescheduleData[appointment.id]?.time
+                      rescheduleData[appointment.id]?.time &&
+                      appointment.visitStatus.toLowerCase() !== 'missed'
                         ? 'bg-blue-500 hover:bg-blue-600 text-white'
                         : 'bg-gray-400 cursor-not-allowed text-gray-700'
                     }`}
                     disabled={
                       !rescheduleData[appointment.id]?.date ||
-                      !rescheduleData[appointment.id]?.time
+                      !rescheduleData[appointment.id]?.time ||
+                      appointment.visitStatus.toLowerCase() === 'missed'
                     }
+                    aria-label={`Reschedule appointment with ${appointment.patientName}`}
                   >
                     {rescheduleData[appointment.id]?.date &&
                     rescheduleData[appointment.id]?.time ? (
