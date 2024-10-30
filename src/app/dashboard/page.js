@@ -21,7 +21,6 @@ import UpdateProfile from '../components/UpdateProfile';
 import PatientBalance from '../components/PatientBalance';
 import OngoingPatients from '../components/OngoingPatients';
 import AppointmentsToday from '../components/AppointmentsToday';
-import AppointmentsThisWeek from '../components/AppointmentsThisWeek';
 import AddVisit from '../components/AddVisit';
 import MissedAppointments from '../components/MissedAppointments';
 import { decryptData } from '../../lib/encryption';

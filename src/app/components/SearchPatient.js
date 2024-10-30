@@ -548,10 +548,10 @@ const SearchPatient = () => {
                 <FiFileText className="mr-2 text-gray-500" />
                 <strong>Notes:</strong> {selectedVisit.notes}
               </p>
-              {selectedVisit.nextVisitDate && selectedVisit.nextVisitTime && (
+              {selectedVisit.visitDate && selectedVisit.visitTime && (
                 <p className="flex items-center">
                   <FiCalendar className="mr-2 text-blue-500" />
-                  <strong>Next Visit:</strong> {selectedVisit.visitDate} at {selectedVisit.valueisitTime}
+                  <strong>Next Visit:</strong> {selectedVisit.visitDate} at {selectedVisit.visitTime}
                 </p>
               )}
             </div>
