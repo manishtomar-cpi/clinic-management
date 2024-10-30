@@ -264,8 +264,8 @@ const DashboardPage = () => {
 
   const handleLogout = async () => {
     showToast('You have successfully logged out!', 'success');
-    await signOut({ callbackUrl: process.env.NEXT_PUBLIC_NEXTAUTH_URL || 'https://dig-clinic.netlify.app/' });
-    router.push('/');
+    await signOut(router.push('/'));
+    
   };
   
 
