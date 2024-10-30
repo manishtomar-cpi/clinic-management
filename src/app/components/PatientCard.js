@@ -10,6 +10,7 @@ import {
   FaCalendarAlt,
   FaArrowRight,
   FaUserEdit,
+  FaTrash,
 } from 'react-icons/fa';
 import { BsTrash, BsPencilSquare } from 'react-icons/bs';
 import { deleteDoc, doc, updateDoc } from 'firebase/firestore';
