@@ -430,7 +430,7 @@ const SearchPatient = () => {
                   {patient.visits && patient.visits.length > 0 && (
                     <p className="flex items-center text-green-700 mt-1">
                       <FiCalendar className="mr-2 text-green-600" />
-                      <strong>Next Visit:</strong> {patient.visits[0].nextVisitDate} at {patient.visits[0].nextVisitTime}
+                      <strong>Next Visit:</strong> {patient.visits[0].visitDate} at {patient.visits[0].visitTime}
                     </p>
                   )}
                 </div>
@@ -551,7 +551,7 @@ const SearchPatient = () => {
               {selectedVisit.nextVisitDate && selectedVisit.nextVisitTime && (
                 <p className="flex items-center">
                   <FiCalendar className="mr-2 text-blue-500" />
-                  <strong>Next Visit:</strong> {selectedVisit.nextVisitDate} at {selectedVisit.nextVisitTime}
+                  <strong>Next Visit:</strong> {selectedVisit.visitDate} at {selectedVisit.valueisitTime}
                 </p>
               )}
             </div>

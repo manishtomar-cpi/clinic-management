@@ -28,6 +28,14 @@ const formatDateForStorage = (dateStr) => {
   return `${day}-${month}-${year}`;
 };
 
+// Mapping of visit statuses to their corresponding background colors
+const visitStatusStyles = {
+  'Upcoming': 'bg-yellow-100',
+  'Rescheduled': 'bg-blue-100',
+  'Missed': 'bg-red-100',
+  'Rescheduled but Missed': 'bg-orange-100',
+};
+
 const AddVisit = () => {
   const { data: session } = useSession();
   const [step, setStep] = useState(1);
@@ -49,7 +57,7 @@ const AddVisit = () => {
   const [patientDetails, setPatientDetails] = useState({});
   const [remainingBalance, setRemainingBalance] = useState(0);
   const [visitHistory, setVisitHistory] = useState([]);
-  const [upcomingVisit, setUpcomingVisit] = useState(null); // New state for upcoming visit
+  const [scheduledVisit, setScheduledVisit] = useState(null); // Renamed from upcomingVisit
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
@@ -61,15 +69,19 @@ const AddVisit = () => {
         }
         const doctorId = session.user.id;
         const patientsRef = collection(db, 'doctors', doctorId, 'patients');
-        const querySnapshot = await getDocs(patientsRef);
+        const q = query(patientsRef, orderBy('name')); // Optional: Order patients by name
+        const querySnapshot = await getDocs(q);
 
-        const patientList = querySnapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            name: decryptData(data.name),
-          };
-        });
+        const patientList = querySnapshot.docs
+          .map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              name: decryptData(data.name),
+              treatmentStatus: data.treatmentStatus || '',
+            };
+          })
+          .filter((patient) => patient.treatmentStatus !== 'Completed'); // Exclude completed patients
 
         setPatients(patientList);
       } catch (error) {
@@ -80,8 +92,8 @@ const AddVisit = () => {
     fetchPatients();
   }, [session]);
 
-  // Fetch upcoming visit if exists
-  const fetchUpcomingVisit = async (patientId) => {
+  // Fetch scheduled visit if exists, for any specified status
+  const fetchScheduledVisit = async (patientId) => {
     try {
       const doctorId = session.user.id;
       const visitsRef = collection(
@@ -94,22 +106,28 @@ const AddVisit = () => {
       );
       const q = query(visitsRef, orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      let upcoming = null;
+      let scheduled = null;
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.visitStatus === 'Upcoming') {
-          upcoming = {
+        if (
+          ['Upcoming', 'Rescheduled but Missed', 'Rescheduled', 'Missed'].includes(
+            data.visitStatus
+          )
+        ) {
+          scheduled = {
             id: doc.id,
             ...data,
           };
+          // Assuming only one scheduled visit is needed; break the loop
+          return;
         }
       });
 
-      setUpcomingVisit(upcoming);
+      setScheduledVisit(scheduled);
     } catch (error) {
-      console.error('Error fetching upcoming visit:', error);
-      showToast('Error fetching upcoming visit.', 'error');
+      console.error('Error fetching scheduled visit:', error);
+      showToast('Error fetching scheduled visit.', 'error');
     }
   };
 
@@ -117,7 +135,7 @@ const AddVisit = () => {
     setSelectedPatient(option);
     await fetchVisitHistory(option.value);
     await fetchPatientDetails(option.value);
-    await fetchUpcomingVisit(option.value); // Fetch upcoming visit
+    await fetchScheduledVisit(option.value); // Fetch any scheduled visit, not just upcoming
     setErrors({ ...errors, selectedPatient: '' });
   };
 
@@ -308,8 +326,6 @@ const AddVisit = () => {
       'treatmentStatus',
       'visitDate',
       'visitTime',
-      'nextVisitDate',
-      'nextVisitTime',
       'totalAmount',
       'amountPaid',
       'visitReason',
@@ -317,12 +333,16 @@ const AddVisit = () => {
     // Encrypt the rest
     for (const key in visitData) {
       if (plaintextFields.includes(key)) {
-        if (key === 'visitDate' || key === 'nextVisitDate') {
+        if (key === 'visitDate') {
           dataToStore[key] = formatDateForStorage(visitData[key]);
         } else {
           dataToStore[key] = visitData[key];
         }
       } else {
+        // Exclude nextVisitDate and nextVisitTime from the current visit
+        if (key === 'nextVisitDate' || key === 'nextVisitTime') {
+          continue;
+        }
         dataToStore[key] = encryptData(visitData[key]);
       }
     }
@@ -349,27 +369,31 @@ const AddVisit = () => {
         treatmentStatus: visitData.treatmentStatus, // Store as plaintext
       });
 
-      // Handle Upcoming Visit
+      // Handle Scheduled Visit
       if (visitData.nextVisitDate && visitData.nextVisitTime) {
-        if (upcomingVisit) {
-          // Update existing upcoming visit
-          const upcomingVisitRef = doc(
+        const scheduledVisitData = {
+          visitDate: formatDateForStorage(visitData.nextVisitDate),
+          visitTime: visitData.nextVisitTime,
+          visitStatus: 'Upcoming', // Default to 'Upcoming'; can be adjusted as needed
+          createdAt: new Date(),
+        };
+
+        if (scheduledVisit) {
+          // Update existing scheduled visit
+          const scheduledVisitRef = doc(
             db,
             'doctors',
             doctorId,
             'patients',
             patientId,
             'visits',
-            upcomingVisit.id
+            scheduledVisit.id
           );
-          await updateDoc(upcomingVisitRef, {
-            nextVisitDate: formatDateForStorage(visitData.nextVisitDate),
-            nextVisitTime: visitData.nextVisitTime,
-            visitStatus: 'Upcoming',
-            createdAt: new Date(),
+          await updateDoc(scheduledVisitRef, {
+            ...scheduledVisitData,
           });
         } else {
-          // Add new upcoming visit
+          // Add new scheduled visit
           await addDoc(
             collection(
               db,
@@ -379,12 +403,7 @@ const AddVisit = () => {
               patientId,
               'visits'
             ),
-            {
-              visitDate: formatDateForStorage(visitData.nextVisitDate),
-              visitTime: visitData.nextVisitTime,
-              visitStatus: 'Upcoming',
-              createdAt: new Date(),
-            }
+            scheduledVisitData
           );
         }
       }
@@ -407,7 +426,7 @@ const AddVisit = () => {
       setStep(1);
       setSelectedPatient(null);
       setVisitHistory([]);
-      setUpcomingVisit(null);
+      setScheduledVisit(null);
       setRemainingBalance(0);
     } catch (error) {
       console.error('Error adding visit:', error);
@@ -432,7 +451,7 @@ const AddVisit = () => {
               nextStep={nextStep}
               errors={errors}
               patientDetails={patientDetails}
-              upcomingVisit={upcomingVisit} // Pass upcomingVisit
+              scheduledVisit={scheduledVisit} // Pass scheduledVisit
             />
           )}
           {step === 2 && (
@@ -451,7 +470,7 @@ const AddVisit = () => {
               nextStep={nextStep}
               prevStep={prevStep}
               errors={errors}
-              upcomingVisit={upcomingVisit} // Pass upcomingVisit if needed
+              scheduledVisit={scheduledVisit} // Pass scheduledVisit if needed
             />
           )}
           {step === 4 && (
@@ -462,7 +481,7 @@ const AddVisit = () => {
               remainingBalance={remainingBalance}
               calculateNewBalance={calculateNewBalance}
               patientDetails={patientDetails}
-              upcomingVisit={upcomingVisit} // Pass upcomingVisit
+              scheduledVisit={scheduledVisit} // Pass scheduledVisit
             />
           )}
         </form>
@@ -494,82 +513,107 @@ const StepOne = ({
   nextStep,
   errors,
   patientDetails,
-  upcomingVisit,
-}) => (
-  <>
-    <div className="mb-6 relative">
-      <label className="block text-gray-700 font-semibold mb-2">
-        Select Patient
-      </label>
-      <Select
-        options={patients.map((patient) => ({
-          value: patient.id,
-          label: patient.name,
-        }))}
-        value={selectedPatient}
-        onChange={handlePatientChange}
-        placeholder="Choose a patient..."
-        classNamePrefix="react-select"
-        styles={{
-          menu: (provided) => ({ ...provided, zIndex: 9999 }),
-          control: (provided) => ({
-            ...provided,
-            borderColor: errors.selectedPatient ? 'red' : provided.borderColor,
-            zIndex: 2,
-          }),
-        }}
-        menuPortalTarget={typeof window !== 'undefined' ? document.body : null}
-        menuPosition="fixed"
-      />
-      {errors.selectedPatient && (
-        <p className="text-red-500 text-sm mt-1">{errors.selectedPatient}</p>
+  scheduledVisit,
+}) => {
+  // Function to get the appropriate background color based on visitStatus
+  const getScheduledVisitStyle = (status) => {
+    return visitStatusStyles[status] || 'bg-gray-100';
+  };
+
+  // Function to get icon based on visitStatus
+  const getScheduledVisitIcon = (status) => {
+    switch (status) {
+      case 'Upcoming':
+        return <FaClock className="inline-block mr-2" />;
+      case 'Rescheduled':
+        return <FaHeartbeat className="inline-block mr-2" />;
+      case 'Missed':
+        return <FaTimesCircle className="inline-block mr-2" />;
+      case 'Rescheduled but Missed':
+        return <FaCheckCircle className="inline-block mr-2" />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <>
+      <div className="mb-6 relative">
+        <label className="block text-gray-700 font-semibold mb-2">
+          Select Patient
+        </label>
+        <Select
+          options={patients.map((patient) => ({
+            value: patient.id,
+            label: patient.name,
+          }))}
+          value={selectedPatient}
+          onChange={handlePatientChange}
+          placeholder="Choose a patient..."
+          classNamePrefix="react-select"
+          styles={{
+            menu: (provided) => ({ ...provided, zIndex: 9999 }),
+            control: (provided) => ({
+              ...provided,
+              borderColor: errors.selectedPatient ? 'red' : provided.borderColor,
+              zIndex: 2,
+            }),
+          }}
+          menuPortalTarget={typeof window !== 'undefined' ? document.body : null}
+          menuPosition="fixed"
+        />
+        {errors.selectedPatient && (
+          <p className="text-red-500 text-sm mt-1">{errors.selectedPatient}</p>
+        )}
+      </div>
+      {selectedPatient && patientDetails && (
+        <div className="mt-4 p-4 bg-white rounded shadow">
+          <p>
+            <strong>Name:</strong> {patientDetails.name || 'N/A'}
+          </p>
+          <p>
+            <strong>Disease:</strong> {patientDetails.disease || 'N/A'}
+          </p>
+          <p>
+            <strong>Treatment Status:</strong> {patientDetails.treatmentStatus || 'N/A'}
+          </p>
+          <p>
+            <strong>Mobile Number:</strong> {patientDetails.mobileNumber || 'N/A'}
+          </p>
+          <p>
+            <strong>Address:</strong> {patientDetails.address || 'N/A'}
+          </p>
+        </div>
       )}
-    </div>
-    {selectedPatient && patientDetails && (
-      <div className="mt-4 p-4 bg-white rounded shadow">
-        <p>
-          <strong>Name:</strong> {patientDetails.name || 'N/A'}
-        </p>
-        <p>
-          <strong>Disease:</strong> {patientDetails.disease || 'N/A'}
-        </p>
-        <p>
-          <strong>Treatment Status:</strong> {patientDetails.treatmentStatus || 'N/A'}
-        </p>
-        <p>
-          <strong>Mobile Number:</strong> {patientDetails.mobileNumber || 'N/A'}
-        </p>
-        <p>
-          <strong>Address:</strong> {patientDetails.address || 'N/A'}
-        </p>
+      {scheduledVisit && (
+        <div className={`mt-4 p-4 rounded shadow ${getScheduledVisitStyle(scheduledVisit.visitStatus)}`}>
+          <h3 className="text-lg font-semibold mb-2">
+            {getScheduledVisitIcon(scheduledVisit.visitStatus)} Scheduled Visit
+          </h3>
+          <p>
+            <strong>Date:</strong> {scheduledVisit.visitDate || 'N/A'}
+          </p>
+          <p>
+            <strong>Time:</strong> {scheduledVisit.visitTime || 'N/A'}
+          </p>
+          <p>
+            <strong>Status:</strong> {scheduledVisit.visitStatus || 'N/A'}
+          </p>
+          {/* Optionally, you can add a button or link to navigate to the scheduled visit details */}
+        </div>
+      )}
+      <div className="flex justify-end mt-6">
+        <button
+          type="button"
+          onClick={nextStep}
+          className="bg-teal-600 text-white py-2 px-4 rounded hover:bg-teal-700"
+        >
+          Next
+        </button>
       </div>
-    )}
-    {upcomingVisit && (
-      <div className="mt-4 p-4 bg-yellow-100 rounded shadow">
-        <h3 className="text-lg font-semibold mb-2 text-yellow-700">Upcoming Visit</h3>
-        <p>
-          <strong>Date:</strong> {upcomingVisit.visitDate || 'N/A'}
-        </p>
-        <p>
-          <strong>Time:</strong> {upcomingVisit.visitTime || 'N/A'}
-        </p>
-        <p>
-          <strong>Status:</strong> {upcomingVisit.visitStatus || 'N/A'}
-        </p>
-        {/* Optionally, you can add a button or link to navigate to the upcoming visit details */}
-      </div>
-    )}
-    <div className="flex justify-end mt-6">
-      <button
-        type="button"
-        onClick={nextStep}
-        className="bg-teal-600 text-white py-2 px-4 rounded hover:bg-teal-700"
-      >
-        Next
-      </button>
-    </div>
-  </>
-);
+    </>
+  );
+};
 
 // Step Two Component (Medical Details)
 const StepTwo = ({ visitData, handleChange, nextStep, prevStep, errors }) => (
@@ -636,7 +680,7 @@ const StepTwo = ({ visitData, handleChange, nextStep, prevStep, errors }) => (
 );
 
 // Step Three Component (Financial Details)
-const StepThree = ({ visitData, handleChange, nextStep, prevStep, errors, upcomingVisit }) => (
+const StepThree = ({ visitData, handleChange, nextStep, prevStep, errors, scheduledVisit }) => (
   <>
     <SelectField
       label="Treatment Status"
@@ -727,7 +771,7 @@ const StepFour = ({
   remainingBalance,
   calculateNewBalance,
   patientDetails,
-  upcomingVisit,
+  scheduledVisit,
 }) => (
   <>
     <div className="mt-6 p-4 bg-white rounded shadow">
@@ -781,20 +825,20 @@ const StepFour = ({
           <strong>Notes:</strong> {visitData.notes}
         </p>
       )}
-      {upcomingVisit && (
-        <div className="mt-4 p-4 bg-yellow-100 rounded shadow">
-          <h3 className="text-lg font-semibold mb-2 text-yellow-700">Existing Upcoming Visit</h3>
+      {scheduledVisit && (
+        <div className={`mt-4 p-4 rounded ${visitStatusStyles[scheduledVisit.visitStatus] || 'bg-gray-100'}`}>
+          <h3 className="text-lg font-semibold mb-2 text-teal-700">Existing Scheduled Visit</h3>
           <p>
-            <strong>Date:</strong> {upcomingVisit.visitDate || 'N/A'}
+            <strong>Date:</strong> {scheduledVisit.visitDate || 'N/A'}
           </p>
           <p>
-            <strong>Time:</strong> {upcomingVisit.visitTime || 'N/A'}
+            <strong>Time:</strong> {scheduledVisit.visitTime || 'N/A'}
           </p>
           <p>
-            <strong>Status:</strong> {upcomingVisit.visitStatus || 'N/A'}
+            <strong>Status:</strong> {scheduledVisit.visitStatus || 'N/A'}
           </p>
           <p>
-            <strong>Note:</strong> This upcoming visit will be updated with the new details provided above.
+            <strong>Note:</strong> This scheduled visit will be updated with the new details provided above.
           </p>
         </div>
       )}

@@ -23,6 +23,11 @@ const Sidebar = ({ onMenuItemClick, activeItem }) => {
       icon: <FaChartBar className="text-indigo-500" />,
     },
     {
+      name: 'Total Patient',
+      component: 'TotalPatient',
+      icon: <FaCalendarCheck className="text-purple-500" />,
+    },
+    {
       name: 'Ongoing Patients',
       component: 'OngoingPatients',
       icon: <FiClipboard className="text-blue-500" />,
@@ -32,11 +37,7 @@ const Sidebar = ({ onMenuItemClick, activeItem }) => {
       component: 'AppointmentsToday',
       icon: <FiCalendar className="text-green-500" />,
     },
-    {
-      name: 'Appointments This Week',
-      component: 'AppointmentsThisWeek',
-      icon: <FaCalendarCheck className="text-purple-500" />,
-    },
+ 
     {
       name: 'Missed Appointments',
       component: 'MissedAppointments',

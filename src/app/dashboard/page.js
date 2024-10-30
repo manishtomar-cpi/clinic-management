@@ -28,6 +28,7 @@ import { decryptData } from '../../lib/encryption';
 import { db } from '../../db';
 import { collection, onSnapshot } from 'firebase/firestore';
 import StatsChart from '../components/StatsChart';
+import TotalPatient from '../components/TotalPatient';
 
 // Spinner Component
 const MedicalSpinner = () => {
@@ -47,6 +48,7 @@ const DashboardPage = () => {
   const [tileData, setTileData] = useState([]);
   const [allVisits, setAllVisits] = useState([]); // Centralized state for all visits
   const visitsListenersRef = useRef([]); // To store visits listeners
+  const [totalPatients, setTotalPatients] = useState(0); // Track total patients
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -78,6 +80,7 @@ const DashboardPage = () => {
       patientsRef,
       (patientsSnapshot) => {
         const patientIds = patientsSnapshot.docs.map((doc) => doc.id);
+        setTotalPatients(patientIds.length); // Set total patients count
 
         // Clean up existing visits listeners
         visitsListenersRef.current.forEach((unsub) => unsub());
@@ -138,7 +141,7 @@ const DashboardPage = () => {
     let ongoingTreatments = 0;
     let outstandingBalance = 0;
     let appointmentsToday = 0;
-    let appointmentsThisWeek = 0;
+    // Removed appointmentsThisWeek since the tile is being replaced
     let missedAppointmentsToday = 0;
 
     const now = new Date();
@@ -154,16 +157,14 @@ const DashboardPage = () => {
     endOfWeek.setDate(startOfWeek.getDate() + 6); // End of the current week (Saturday)
     endOfWeek.setHours(23, 59, 59, 999);
 
-    // Extract unique patient IDs
-    const uniquePatientIds = new Set(allVisits.map((visit) => visit.patientId));
-    const totalPatients = uniquePatientIds.size;
-
     allVisits.forEach((visit) => {
       let treatmentStatus = '';
       let totalAmount = 0;
       let amountPaid = 0;
       let nextVisitDateStr = '';
       let nextVisitTimeStr = '';
+      let visitDateStr = '';
+      let visitTimeStr = '';
 
       try {
         treatmentStatus = decryptData(visit.treatmentStatus || '');
@@ -171,6 +172,8 @@ const DashboardPage = () => {
         amountPaid = parseFloat(decryptData(visit.amountPaid) || '0');
         nextVisitDateStr = decryptData(visit.nextVisitDate);
         nextVisitTimeStr = decryptData(visit.nextVisitTime);
+        visitDateStr = decryptData(visit.visitDate);
+        visitTimeStr = decryptData(visit.visitTime);
       } catch (error) {
         console.error('Decryption Error for visit:', visit.id, error);
         // Optionally, show a toast or handle the error as needed
@@ -183,36 +186,26 @@ const DashboardPage = () => {
 
       outstandingBalance += totalAmount - amountPaid;
 
-      if (nextVisitDateStr) {
-        const [day, month, year] = nextVisitDateStr.split('-').map(Number);
-        const nextVisitDate = new Date(year, month - 1, day);
+      if (visitDateStr) {
+        const [day, month, year] = visitDateStr.split('-').map(Number);
+        const [hours, minutes] = visitTimeStr.split(':').map(Number);
+        const visitDateTime = new Date(year, month - 1, day, hours, minutes);
 
-        // If next visit time is available, use it; otherwise, assume it's at the start of the day
-        if (nextVisitTimeStr) {
-          const [hours, minutes] = nextVisitTimeStr.split(':').map(Number);
-          nextVisitDate.setHours(hours, minutes, 0, 0);
-        } else {
-          nextVisitDate.setHours(0, 0, 0, 0);
+        // Check if the visit is today for appointmentsToday count
+        if (visitDateTime >= todayStart && visitDateTime <= todayEnd) {
+          appointmentsToday += 1;
         }
 
-        // Check if the visit is today and missed
+        // Check if the visit is missed today
         if (
-          nextVisitDate >= todayStart &&
-          nextVisitDate < now &&
+          visitDateTime >= todayStart &&
+          visitDateTime < now &&
           treatmentStatus !== 'Completed'
         ) {
           missedAppointmentsToday += 1;
         }
 
-        // Check if the visit is today for appointmentsToday count
-        if (nextVisitDate >= todayStart && nextVisitDate <= todayEnd) {
-          appointmentsToday += 1;
-        }
-
-        // Check if the visit is within this week
-        if (nextVisitDate >= startOfWeek && nextVisitDate <= endOfWeek) {
-          appointmentsThisWeek += 1;
-        }
+        // Optionally, handle appointmentsThisWeek if needed in the future
       }
     });
 
@@ -220,10 +213,10 @@ const DashboardPage = () => {
       {
         title: 'Total Patients',
         count: totalPatients,
-        icon: <FiUsers className="text-blue-500" />,
-        color: 'border-blue-500',
+        icon: <FiUsers className="text-purple-500" />, // Updated icon color to purple
+        color: 'border-purple-500', // Updated border color to purple
         description: 'Number of registered patients',
-        component: 'OngoingPatients',
+        component: 'TotalPatient', // Updated component to TotalPatient
       },
       {
         title: 'Ongoing Treatments',
@@ -241,14 +234,7 @@ const DashboardPage = () => {
         description: 'Scheduled appointments for today',
         component: 'AppointmentsToday',
       },
-      {
-        title: 'Appointments This Week',
-        count: appointmentsThisWeek,
-        icon: <FaCalendarCheck className="text-teal-500" />,
-        color: 'border-teal-500',
-        description: 'Scheduled appointments for this week',
-        component: 'AppointmentsThisWeek',
-      },
+      // Removed "Appointments This Week" tile
       {
         title: 'Missed Appointments Today',
         count: missedAppointmentsToday,
@@ -266,7 +252,7 @@ const DashboardPage = () => {
         component: 'PatientBalance',
       },
     ]);
-  }, [allVisits]);
+  }, [allVisits, totalPatients]);
 
   if (status === 'loading') {
     return <MedicalSpinner />;
@@ -280,8 +266,6 @@ const DashboardPage = () => {
     showToast('You have successfully logged out!', 'success');
     await signOut({ callbackUrl: process.env.NEXTAUTH_URL || 'https://dig-clinic.netlify.app/' });
   };
-  
-  
 
   const handleTileClick = (component) => {
     setActiveContent(component);
@@ -291,7 +275,7 @@ const DashboardPage = () => {
     if (component === 'Logout') {
       handleLogout();
     } else if (component === 'Home') {
-      router.push( process.env.NEXTAUTH_URL);
+      router.push(process.env.NEXTAUTH_URL);
     } else {
       setActiveContent(component);
     }
@@ -313,8 +297,8 @@ const DashboardPage = () => {
         return <OngoingPatients />;
       case 'AppointmentsToday':
         return <AppointmentsToday />;
-      case 'AppointmentsThisWeek':
-        return <AppointmentsThisWeek />;
+      case 'TotalPatient':
+        return <TotalPatient />;
       case 'MissedAppointments':
         return <MissedAppointments />;
       case 'Dashboard':
