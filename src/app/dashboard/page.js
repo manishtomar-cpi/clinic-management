@@ -265,6 +265,7 @@ const DashboardPage = () => {
   const handleLogout = async () => {
     showToast('You have successfully logged out!', 'success');
     await signOut({ callbackUrl: process.env.NEXT_PUBLIC_NEXTAUTH_URL || 'https://dig-clinic.netlify.app/' });
+    router.push('/');
   };
   
 
@@ -276,7 +277,7 @@ const DashboardPage = () => {
     if (component === 'Logout') {
       handleLogout();
     } else if (component === 'Home') {
-      router.push(process.env.NEXTAUTH_URL);
+      router.push('/');
     } else {
       setActiveContent(component);
     }

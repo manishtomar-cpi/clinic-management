@@ -37,8 +37,7 @@ const PatientCard = ({ patient }) => {
   } = patient;
 
   const { data: session } = useSession();
-  const doctorId = session?.user?.id; // Ensure session is available
-
+  const doctorId = session?.user?.id; 
   // Helper function to determine badge color based on treatment status
   const getStatusColor = (status) => {
     switch (status.toLowerCase()) {
