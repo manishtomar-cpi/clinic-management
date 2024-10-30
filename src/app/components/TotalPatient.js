@@ -7,31 +7,15 @@ import { db } from '../../db';
 import {
   collection,
   onSnapshot,
-  doc,
   query,
   orderBy,
 } from 'firebase/firestore';
 import { useSession } from 'next-auth/react';
 import { decryptData } from '../../lib/encryption';
-import { motion } from 'framer-motion';
 import { BsSearch } from 'react-icons/bs';
 import { FaClinicMedical } from 'react-icons/fa';
 import { showToast } from './Toast';
 import PatientCard from './PatientCard'; // Import the PatientCard component
-
-// Helper function to format dates from 'dd-mm-yyyy' to 'dd-mm-yyyy' (for display)
-const formatDateForDisplay = (dateStr) => {
-  if (!dateStr) return 'N/A';
-  const [day, month, year] = dateStr.split('-').map(Number);
-  return `${day}-${month}-${year}`;
-};
-
-// Helper function to parse date strings to Date objects
-const parseDate = (dateStr) => {
-  if (!dateStr) return null;
-  const [day, month, year] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
-};
 
 const TotalPatient = () => {
   const { data: session } = useSession();
@@ -48,14 +32,12 @@ const TotalPatient = () => {
     const doctorId = session.user.id;
     const patientsRef = collection(db, 'doctors', doctorId, 'patients');
 
-    const unsubscribePatients = onSnapshot(patientsRef, (patientsSnapshot) => {
-      const patientsData = [];
+    const unsubscribePatients = onSnapshot(
+      patientsRef,
+      (patientsSnapshot) => {
+        const patientsData = [];
 
-      const patientIds = patientsSnapshot.docs.map(docSnap => docSnap.id);
-
-      patientIds.forEach(patientId => {
-        const patientDoc = patientsSnapshot.docs.find(doc => doc.id === patientId);
-        if (patientDoc) {
+        patientsSnapshot.docs.forEach((patientDoc) => {
           const data = patientDoc.data();
           const decryptedName = data.name ? decryptData(data.name) : 'Unknown';
           const decryptedAddress = data.address ? decryptData(data.address) : 'N/A';
@@ -64,11 +46,11 @@ const TotalPatient = () => {
           const treatmentStatus = data.treatmentStatus || 'N/A';
 
           // Fetch visits for the patient
-          const visitsRef = collection(db, 'doctors', doctorId, 'patients', patientId, 'visits');
+          const visitsRef = collection(db, 'doctors', doctorId, 'patients', patientDoc.id, 'visits');
           const visitsQuery = query(visitsRef, orderBy('createdAt', 'desc'));
 
           onSnapshot(visitsQuery, (visitsSnapshot) => {
-            const visits = visitsSnapshot.docs.map(visitDoc => {
+            const visits = visitsSnapshot.docs.map((visitDoc) => {
               const visitData = visitDoc.data();
               return {
                 id: visitDoc.id,
@@ -84,7 +66,7 @@ const TotalPatient = () => {
             const lastVisit = sortedVisits[0] || null;
 
             // Determine Next Visit
-            const upcomingVisits = visits.filter(visit => {
+            const upcomingVisits = visits.filter((visit) => {
               const visitDateTime = visit.visitDate && visit.visitTime ? new Date(`${visit.visitDate} ${visit.visitTime}`) : null;
               return visitDateTime && visitDateTime > new Date();
             }).sort((a, b) => a.createdAt - b.createdAt);
@@ -92,32 +74,37 @@ const TotalPatient = () => {
             const nextVisit = upcomingVisits[0] || null;
 
             patientsData.push({
-              id: patientId,
+              id: patientDoc.id,
               name: decryptedName,
               address: decryptedAddress,
               mobileNumber: decryptedMobileNumber,
               email: decryptedEmail,
               treatmentStatus,
-              lastVisit: lastVisit ? {
-                date: lastVisit.visitDate,
-                time: lastVisit.visitTime,
-                status: lastVisit.visitStatus,
-              } : null,
-              nextVisit: nextVisit ? {
-                date: nextVisit.visitDate,
-                time: nextVisit.visitTime,
-                status: nextVisit.visitStatus,
-              } : null,
+              lastVisit: lastVisit
+                ? {
+                    date: lastVisit.visitDate,
+                    time: lastVisit.visitTime,
+                    status: lastVisit.visitStatus,
+                  }
+                : null,
+              nextVisit: nextVisit
+                ? {
+                    date: nextVisit.visitDate,
+                    time: nextVisit.visitTime,
+                    status: nextVisit.visitStatus,
+                  }
+                : null,
             });
 
             setPatients([...patientsData]);
           });
-        }
-      });
-    }, (error) => {
-      console.error('Error fetching patients:', error);
-      showToast('Error fetching patients. Please try again later.', 'error');
-    });
+        });
+      },
+      (error) => {
+        console.error('Error fetching patients:', error);
+        showToast('Error fetching patients. Please try again later.', 'error');
+      }
+    );
 
     return () => {
       unsubscribePatients();
@@ -126,7 +113,7 @@ const TotalPatient = () => {
 
   // Filter patients based on search term
   const filteredPatients = useMemo(() => {
-    return patients.filter(patient => {
+    return patients.filter((patient) => {
       const term = searchTerm.toLowerCase();
       return (
         patient.name.toLowerCase().includes(term) ||
@@ -160,7 +147,7 @@ const TotalPatient = () => {
       {/* Patients Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredPatients.length > 0 ? (
-          filteredPatients.map(patient => (
+          filteredPatients.map((patient) => (
             <PatientCard key={patient.id} patient={patient} />
           ))
         ) : (
