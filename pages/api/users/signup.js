@@ -1,13 +1,13 @@
 // pages/api/users/signup.js
 
-import { db } from '../../../src/db';
+import { db } from '../../../src/db'; // Ensure this points to your Firebase config
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { encryptData } from '../../../src/lib/encryption';
 import bcrypt from 'bcryptjs';
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
-    const { username, doctorName, clinicName, password, clinicLocation } = req.body;
+    const { username, doctorName, clinicName, email, password, clinicLocation } = req.body;
 
     try {
       // Input validation
@@ -15,11 +15,13 @@ export default async function handler(req, res) {
         !username ||
         !doctorName ||
         !clinicName ||
+        !email ||
         !password ||
         !clinicLocation ||
         typeof username !== 'string' ||
         typeof doctorName !== 'string' ||
         typeof clinicName !== 'string' ||
+        typeof email !== 'string' ||
         typeof password !== 'string' ||
         typeof clinicLocation !== 'string'
       ) {
@@ -35,15 +37,33 @@ export default async function handler(req, res) {
         });
       }
 
+      // Validate email format
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailPattern.test(email)) {
+        return res.status(400).json({
+          message: 'Please enter a valid email address.',
+        });
+      }
+
       // Check if username already exists
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('username', '==', username));
-      const querySnapshot = await getDocs(q);
+      const qUsername = query(usersRef, where('username', '==', username));
 
-      if (!querySnapshot.empty) {
+      const querySnapshotUsername = await getDocs(qUsername);
+
+      if (!querySnapshotUsername.empty) {
         // Username already exists
         return res.status(409).json({ message: 'Username is already taken' });
       }
+
+      // Removed email uniqueness check to allow multiple users with the same email
+      // const qEmail = query(usersRef, where('email', '==', email));
+      // const querySnapshotEmail = await getDocs(qEmail);
+      //
+      // if (!querySnapshotEmail.empty) {
+      //   // Email already exists
+      //   return res.status(409).json({ message: 'Email is already registered' });
+      // }
 
       // Hash the password before storing
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -59,6 +79,7 @@ export default async function handler(req, res) {
         doctorName: encryptedDoctorName,
         clinicName: encryptedClinicName,
         clinicLocation: encryptedClinicLocation,
+        email, // Store email as plain text for communication
         password: hashedPassword, // Store hashed password
         createdAt: new Date().toISOString(),
       });

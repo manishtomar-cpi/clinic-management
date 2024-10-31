@@ -1,13 +1,13 @@
 // src/pages/signup.js
 
-"use client";
-import React, { useState, useEffect, useCallback } from 'react';
+"use client"; // Ensures that this component is rendered on the client side
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FaUserMd,
   FaClinicMedical,
   FaLock,
   FaUser,
-  FaHeartbeat,
   FaEye,
   FaEyeSlash,
   FaQuestionCircle,
@@ -15,33 +15,124 @@ import {
   FaCheck,
   FaMapMarkerAlt,
   FaTimes,
+  FaEnvelope,
+  FaCheckCircle,
 } from 'react-icons/fa';
-import { showToast } from '../components/Toast';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import debounce from 'lodash.debounce';
+import 'animate.css'; // If using Animate.css for animations
+
+// Custom OTP Input Component
+const CustomOtpInput = ({ length, value, onChange, error }) => {
+  const [otp, setOtp] = useState(Array(length).fill(''));
+  const inputsRef = useRef([]);
+
+  useEffect(() => {
+    // Update parent value when OTP changes
+    onChange(otp.join(''));
+  }, [otp, onChange]);
+
+  const handleChange = (element, index) => {
+    const val = element.value;
+    if (/[^0-9]/.test(val)) return; // Only allow digits
+
+    const newOtp = [...otp];
+    newOtp[index] = val;
+    setOtp(newOtp);
+
+    // Move focus to next input if not the last
+    if (val && index < length - 1) {
+      inputsRef.current[index + 1].focus();
+    }
+  };
+
+  const handleKeyDown = (e, index) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      const newOtp = [...otp];
+      newOtp[index - 1] = '';
+      setOtp(newOtp);
+      inputsRef.current[index - 1].focus();
+    }
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData('text').trim();
+    if (/^\d+$/.test(pasteData)) {
+      const pasteOtp = pasteData.slice(0, length).split('');
+      const newOtp = [...otp];
+      pasteOtp.forEach((digit, idx) => {
+        newOtp[idx] = digit;
+        if (inputsRef.current[idx]) {
+          inputsRef.current[idx].value = digit;
+        }
+      });
+      setOtp(newOtp);
+      if (pasteOtp.length < length) {
+        inputsRef.current[pasteOtp.length].focus();
+      }
+    }
+  };
+
+  return (
+    <div className="flex justify-center" onPaste={handlePaste}>
+      {otp.map((data, index) => (
+        <input
+          key={index}
+          type="text"
+          name={`otp-${index}`}
+          maxLength="1"
+          value={otp[index]}
+          onChange={(e) => handleChange(e.target, index)}
+          onKeyDown={(e) => handleKeyDown(e, index)}
+          ref={(el) => (inputsRef.current[index] = el)}
+          className={`w-12 h-12 mx-1 text-center border ${
+            error ? 'border-red-500' : 'border-gray-300'
+          } rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition`}
+          aria-label={`OTP Digit ${index + 1}`}
+        />
+      ))}
+    </div>
+  );
+};
 
 const Signup = () => {
   const [formData, setFormData] = useState({
     username: '',
     doctorName: '',
     clinicName: '',
+    email: '',
     password: '',
+    confirmPassword: '',
     clinicLocation: '',
   });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false); // For Confirm Password
   const [showPasswordInfo, setShowPasswordInfo] = useState(false);
+
   const [passwordError, setPasswordError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [usernameAvailable, setUsernameAvailable] = useState(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
 
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtpValue] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [timer, setTimer] = useState(900); // 15 minutes in seconds
+
   const router = useRouter();
 
+  // Validate Username
   const validateUsername = (username) => {
-    // Username must be at least 6 characters and can include letters, digits, underscores, and periods
     const usernamePattern = /^[a-zA-Z0-9._]{6,}$/;
     if (!usernamePattern.test(username)) {
       return 'Username must be at least 6 characters and can include letters, digits, underscores, and periods.';
@@ -49,6 +140,7 @@ const Signup = () => {
     return '';
   };
 
+  // Debounced Username Availability Check
   const debouncedCheckUsername = useCallback(
     debounce(async (username) => {
       if (usernameError) {
@@ -58,6 +150,7 @@ const Signup = () => {
       setCheckingUsername(true);
       try {
         const response = await axios.get(`/api/users/check-username?username=${username}`);
+        // Assuming the API returns { available: true } for available usernames
         if (response.data.available) {
           setUsernameAvailable(true);
         } else {
@@ -65,7 +158,7 @@ const Signup = () => {
         }
       } catch (error) {
         console.error('Error checking username:', error);
-        showToast('Error checking username. Please try again.', 'error');
+        toast.error('Error checking username. Please try again.');
         setUsernameAvailable(false);
       } finally {
         setCheckingUsername(false);
@@ -75,22 +168,36 @@ const Signup = () => {
   );
 
   useEffect(() => {
-    // Cleanup function to cancel debounce on unmount
     return () => {
       debouncedCheckUsername.cancel();
     };
   }, [debouncedCheckUsername]);
 
+  // Handle Input Changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
 
-    // Password validation
+    // Password Validation
     if (name === 'password') {
       validatePassword(value);
+      if (formData.confirmPassword && value !== formData.confirmPassword) {
+        setConfirmPasswordError('Passwords do not match.');
+      } else {
+        setConfirmPasswordError('');
+      }
     }
 
-    // Username validation
+    // Confirm Password Validation
+    if (name === 'confirmPassword') {
+      if (value !== formData.password) {
+        setConfirmPasswordError('Passwords do not match.');
+      } else {
+        setConfirmPasswordError('');
+      }
+    }
+
+    // Username Validation
     if (name === 'username') {
       const error = validateUsername(value);
       setUsernameError(error);
@@ -99,8 +206,22 @@ const Signup = () => {
         debouncedCheckUsername(value);
       }
     }
+
+    // Email Validation (Basic)
+    if (name === 'email') {
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (value && !emailPattern.test(value)) {
+        setEmailVerified(false);
+        setOtpSent(false);
+        setOtpValue('');
+        setOtpError('Please enter a valid email address.');
+      } else {
+        setOtpError('');
+      }
+    }
   };
 
+  // Validate Password
   const validatePassword = (password) => {
     const passwordPattern = /^(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/;
     if (!passwordPattern.test(password)) {
@@ -110,27 +231,95 @@ const Signup = () => {
     }
   };
 
+  // Handle Send OTP
+  const handleSendOtp = async () => {
+    const { email } = formData;
+    if (!email) {
+      setOtpError('Please enter your email.');
+      return;
+    }
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+      setOtpError('Please enter a valid email address.');
+      return;
+    }
+    setOtpError('');
+    try {
+      const response = await axios.post('/api/auth/send-otp', { email });
+      if (response.status === 200) {
+        toast.success('OTP sent to your email.');
+        setOtpSent(true);
+        setTimer(900); // Reset timer to 15 minutes
+      } else {
+        toast.error('Failed to send OTP. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending OTP:', error);
+      toast.error('Error sending OTP. Please try again.');
+    }
+  };
+
+  // Handle Verify OTP
+  const handleVerifyOtp = async () => {
+    if (otp.length !== 6) {
+      setOtpError('OTP must be 6 digits.');
+      return;
+    }
+    setVerifyingOtp(true);
+    try {
+      const response = await axios.post('/api/auth/verify-otp', { email: formData.email, otp });
+      if (response.status === 200 && response.data.verified) {
+        toast.success('Email verified successfully!');
+        setEmailVerified(true);
+        setTimer(0); // Stop the timer
+      } else {
+        setOtpError('Invalid OTP. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error verifying OTP:', error);
+      setOtpError('Error verifying OTP. Please try again.');
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  // Handle Form Submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Client-side validations
+    // Client-side Validations
     if (passwordError) {
-      showToast(passwordError, 'error');
+      toast.error(passwordError);
+      return;
+    }
+
+    if (confirmPasswordError) {
+      toast.error(confirmPasswordError);
       return;
     }
 
     if (usernameError) {
-      showToast(usernameError, 'error');
+      toast.error(usernameError);
       return;
     }
 
-    if (usernameAvailable === false || usernameAvailable === null) {
-      showToast('Please choose a valid and available username.', 'error');
+    if (usernameAvailable === false) {
+      toast.error('Username is already taken.');
+      return;
+    }
+
+    if (usernameAvailable === null) {
+      toast.error('Please choose a valid and available username.');
       return;
     }
 
     if (!formData.clinicLocation.trim()) {
-      showToast('Please enter your clinic location.', 'error');
+      toast.error('Please enter your clinic location.');
+      return;
+    }
+
+    if (!emailVerified) {
+      toast.error('Please verify your email.');
       return;
     }
 
@@ -138,20 +327,29 @@ const Signup = () => {
 
     try {
       // Make a POST request to the signup API
-      const response = await axios.post('/api/users/signup', formData);
+      const response = await axios.post('/api/users/signup', {
+        username: formData.username,
+        doctorName: formData.doctorName,
+        clinicName: formData.clinicName,
+        email: formData.email,
+        password: formData.password,
+        clinicLocation: formData.clinicLocation,
+      });
 
       if (response.status === 201) {
-        showToast('Signup successful!', 'success');
-        router.push('/login'); // Redirect to dashboard after signup
+        toast.success('Signup successful!');
+        router.push('/login'); // Redirect to login after signup
       } else {
-        showToast('Signup failed! Please try again.', 'error');
+        toast.error('Signup failed! Please try again.');
       }
     } catch (error) {
-      // Check if the error is due to username already taken
+      // Check if the error is due to username or email already taken
       if (error.response && error.response.status === 409) {
-        showToast('Username is already taken. Please choose a different username.', 'error');
+        toast.error(error.response.data.message || 'Username or Email is already taken.');
+      } else if (error.response && error.response.status === 400) {
+        toast.error(error.response.data.message || 'Signup failed! Please try again.');
       } else {
-        showToast('Signup failed! Please try again.', 'error');
+        toast.error('Signup failed! Please try again.');
       }
       console.error('Signup Error:', error);
     } finally {
@@ -159,27 +357,55 @@ const Signup = () => {
     }
   };
 
+  // Toggle Password Visibility
   const togglePasswordVisibility = () => {
     setShowPassword((prev) => !prev);
   };
 
-  const togglePasswordInfo = () => {
-    setShowPasswordInfo((prev) => !prev);
+  // Toggle Confirm Password Visibility
+  const toggleConfirmPasswordVisibility = () => {
+    setShowConfirmPassword((prev) => !prev);
   };
 
+  // Timer Effect for OTP Expiry
+  useEffect(() => {
+    let interval = null;
+    if (otpSent && !emailVerified && timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setOtpError('OTP has expired. Please request a new one.');
+            setOtpSent(false);
+            setOtpValue('');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [otpSent, emailVerified, timer]);
+
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-gray-100">
-      {/* Left Side */}
-      <div className="flex-1 bg-gradient-to-br from-blue-600 to-teal-400 text-white flex flex-col justify-center items-center p-8">
-        <FaClinicMedical className="text-8xl mb-6 animate-bounce" />
-        <h2 className="text-4xl font-bold mb-4">Welcome to Clinic Management</h2>
-        <p className="text-lg md:text-xl text-center">
-          Manage your clinic efficiently. Register today and get started with managing appointments, patients, and visits effortlessly.
-        </p>
+    <div className="min-h-screen flex">
+      {/* Toast Notifications */}
+      <ToastContainer position="top-right" autoClose={5000} hideProgressBar />
+
+      {/* Left Side - Static Image */}
+      <div className="hidden md:flex fixed top-0 left-0 w-1/2 h-full bg-gradient-to-br from-blue-600 to-teal-400 text-white flex-col justify-center items-center p-8">
+        {/* Creative Content */}
+        <div className="text-center animate__animated animate__fadeInLeft">
+          <FaClinicMedical className="text-8xl mb-6 animate-bounce" />
+          <h2 className="text-4xl font-bold mb-4">Welcome to Clinic Management</h2>
+          <p className="text-lg md:text-xl">
+            Manage your clinic efficiently. Register today and get started with managing appointments, patients, and visits effortlessly.
+          </p>
+        </div>
       </div>
 
-      {/* Right Side (Signup Form) */}
-      <div className="flex-1 flex justify-center items-center p-8">
+      {/* Right Side - Scrollable Signup Form */}
+      <div className="w-full md:w-1/2 ml-0 md:ml-[50%] h-full overflow-y-auto flex justify-center items-center p-8">
         <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-8 w-full max-w-lg">
           <h2 className="text-3xl font-semibold text-gray-800 mb-6 text-center">Doctor Signup</h2>
 
@@ -261,7 +487,7 @@ const Signup = () => {
             </div>
           </div>
 
-          {/* Clinic Location (Simple Input Field) */}
+          {/* Clinic Location */}
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="clinicLocation">
               Clinic Location
@@ -281,8 +507,87 @@ const Signup = () => {
             </div>
           </div>
 
+          {/* Email */}
+          <div className="mb-4 relative">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
+              Email Address
+            </label>
+            <div className="flex items-center bg-gray-100 p-2 rounded">
+              <FaEnvelope className="text-purple-500 mr-2" />
+              <input
+                type="email"
+                name="email"
+                id="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                placeholder="Enter your email"
+                required
+                className="bg-gray-100 focus:outline-none w-full"
+              />
+              {!otpSent && (
+                <button
+                  type="button"
+                  onClick={handleSendOtp}
+                  className="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+                >
+                  Verify
+                </button>
+              )}
+              {otpSent && emailVerified && (
+                <FaCheckCircle className="text-green-500 ml-2" title="Email Verified" />
+              )}
+            </div>
+            {otpError && (
+              <p className="text-red-500 text-xs mt-1">{otpError}</p>
+            )}
+            {otpSent && !emailVerified && (
+              <div className="mt-2">
+                <label className="block text-gray-700 text-sm font-bold mb-1" htmlFor="otp">
+                  Enter OTP
+                </label>
+                <div className="flex flex-col items-center">
+                  <CustomOtpInput
+                    length={6} // 6-digit OTP
+                    value={otp}
+                    onChange={setOtpValue}
+                    error={otpError}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyOtp}
+                    className="mt-3 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center"
+                    disabled={verifyingOtp}
+                  >
+                    {verifyingOtp ? (
+                      <FaSpinner className="animate-spin mr-2" />
+                    ) : (
+                      <FaCheck />
+                    )}
+                    Verify
+                  </button>
+                </div>
+                {/* Countdown Timer */}
+                {otpSent && !emailVerified && timer > 0 && (
+                  <p className="text-gray-600 text-xs mt-1">
+                    OTP expires in: {Math.floor(timer / 60)}:{('0' + (timer % 60)).slice(-2)}
+                  </p>
+                )}
+                {/* Expiry Message */}
+                {otpSent && !emailVerified && timer === 0 && (
+                  <p className="text-red-500 text-xs mt-1">OTP has expired. Please request a new one.</p>
+                )}
+                {emailVerified && (
+                  <p className="text-green-500 text-xs mt-1">Email verified!</p>
+                )}
+                {otpError && (
+                  <p className="text-red-500 text-xs mt-1">{otpError}</p>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Password */}
-          <div className="mb-6 relative">
+          <div className="mb-4 relative">
             <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
               Password
             </label>
@@ -302,13 +607,15 @@ const Signup = () => {
                 type="button"
                 onClick={togglePasswordVisibility}
                 className="absolute right-10 text-gray-600 hover:text-gray-800"
+                aria-label="Toggle password visibility"
               >
                 {showPassword ? <FaEyeSlash /> : <FaEye />}
               </button>
               <button
                 type="button"
-                onClick={togglePasswordInfo}
+                onClick={() => setShowPasswordInfo((prev) => !prev)}
                 className="absolute right-2 text-gray-600 hover:text-gray-800"
+                aria-label="Toggle password info"
               >
                 <FaQuestionCircle />
               </button>
@@ -320,6 +627,37 @@ const Signup = () => {
               <p className="text-gray-500 text-xs mt-2">
                 Password must be at least 8 characters, include one uppercase letter, and one special character.
               </p>
+            )}
+          </div>
+
+          {/* Confirm Password */}
+          <div className="mb-6 relative">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="confirmPassword">
+              Confirm Password
+            </label>
+            <div className="flex items-center bg-gray-100 p-2 rounded relative">
+              <FaLock className="text-red-500 mr-2" />
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                name="confirmPassword"
+                id="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
+                placeholder="Re-enter your password"
+                required
+                className="bg-gray-100 focus:outline-none w-full"
+              />
+              <button
+                type="button"
+                onClick={toggleConfirmPasswordVisibility}
+                className="absolute right-10 text-gray-600 hover:text-gray-800"
+                aria-label="Toggle confirm password visibility"
+              >
+                {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+              </button>
+            </div>
+            {confirmPasswordError && (
+              <p className="text-red-500 text-xs mt-1">{confirmPasswordError}</p>
             )}
           </div>
 
