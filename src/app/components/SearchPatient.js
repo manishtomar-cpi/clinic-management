@@ -11,6 +11,7 @@ import {
   FiMail,
   FiPhone,
   FiSearch,
+  FiMap 
 } from 'react-icons/fi';
 import { TailSpin } from 'react-loader-spinner';
 import { useSession } from 'next-auth/react';

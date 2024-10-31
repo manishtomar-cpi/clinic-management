@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'; // For accessing query parame
 import { db } from '../../db';
 import { doc, getDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation'; // Import useRouter
 import { decryptData } from '../../lib/encryption';
 import {
   FiUser,
@@ -17,35 +18,15 @@ import {
   FiClock,
   FiFilter,
   FiCheckCircle,
+  FiArrowLeft,
 } from 'react-icons/fi';
 import { FaTimesCircle } from 'react-icons/fa';
 import { FaHeart } from 'react-icons/fa';
 import Modal from 'react-modal';
-import Timeline from '../components/Timeline'; // Adjust the path as per your project structure
+import Timeline from '../components/Timeline'; 
+import ProtectedRoute from '../components/ProtectedRoute';
 
-// Custom Styles for Modal
-const customStyles = {
-  content: {
-    top: '50%',
-    left: '50%',
-    right: 'auto',
-    bottom: 'auto',
-    marginRight: '-50%',
-    transform: 'translate(-50%, -50%)',
-    width: '90%',
-    maxWidth: '600px',
-    maxHeight: '80vh', // Prevents the modal from exceeding 80% of the viewport height
-    overflowY: 'auto', // Adds scroll if content is too large
-    borderRadius: '1.5rem',
-    padding: '2rem',
-    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
-  },
-  overlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    zIndex: 1000,
-  },
-};
+// ... [rest of the imports and helper functions]
 
 // Helper function to format date from yyyy-MM-dd to dd--mm--yyyy
 const formatDateToDDMMYYYY = (dateStr) => {
@@ -54,6 +35,32 @@ const formatDateToDDMMYYYY = (dateStr) => {
   return `${day}-${month}-${year}`;
 };
 
+// Inside SearchResultPageContent component
+
+// Custom Styles for Modal
+const customStyles = {
+    content: {
+      top: '50%',
+      left: '50%',
+      right: 'auto',
+      bottom: 'auto',
+      marginRight: '-50%',
+      transform: 'translate(-50%, -50%)',
+      width: '90%',
+      maxWidth: '600px',
+      maxHeight: '80vh', // Prevents the modal from exceeding 80% of the viewport height
+      overflowY: 'auto', // Adds scroll if content is too large
+      borderRadius: '1.5rem',
+      padding: '2rem',
+      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+    },
+    overlay: {
+      backgroundColor: 'rgba(0, 0, 0, 0.75)',
+      zIndex: 1000,
+    },
+  };
+  
 // Reusable Function to Render Status Badges
 const renderStatusBadge = (status) => {
   if (!status) return null; // Handle undefined status
@@ -89,8 +96,9 @@ const renderStatusBadge = (status) => {
   );
 };
 
-const SearchResultPage = () => {
-  const { data: session } = useSession();
+const SearchResultPageContent = () => {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [patient, setPatient] = useState(null);
@@ -114,127 +122,138 @@ const SearchResultPage = () => {
   }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError('');
-      setPatient(null);
-      setVisits([]);
-      setFilteredVisits([]);
+    if (status === 'loading') {
+      // Do nothing while loading
+      return;
+    }
+    if (status === 'unauthenticated') {
+      router.push('/login'); // Redirect to login if not authenticated
+      return;
+    }
+    if (status === 'authenticated') {
+      // Proceed with fetching data
+      const fetchData = async () => {
+        setIsLoading(true);
+        setError('');
+        setPatient(null);
+        setVisits([]);
+        setFilteredVisits([]);
 
-      try {
-        if (!session || !session.user || !session.user.id) {
-          setError('User session not found.');
-          setIsLoading(false);
-          return;
-        }
-
-        const patientId = searchParams.get('patientId');
-        if (!patientId) {
-          setError('No patient selected.');
-          setIsLoading(false);
-          return;
-        }
-
-        const doctorId = session.user.id;
-
-        // Fetch patient details
-        const patientRef = doc(db, 'doctors', doctorId, 'patients', patientId);
-        const patientSnap = await getDoc(patientRef);
-
-        if (!patientSnap.exists()) {
-          setError('Patient not found.');
-          setIsLoading(false);
-          return;
-        }
-
-        const patientData = patientSnap.data();
-
-        const decryptedPatient = {
-          id: patientSnap.id,
-          name: decryptData(patientData.name),
-          address: decryptData(patientData.address),
-          email: decryptData(patientData.email || 'Not Provided'),
-          phone: decryptData(patientData.mobileNumber || 'Not Provided'),
-          age: decryptData(patientData.age || 'N/A'),
-          gender: decryptData(patientData.gender || 'N/A'),
-          disease: decryptData(patientData.disease || 'N/A'),
-          notes: decryptData(patientData.notes || 'N/A'),
-          treatmentStatus: patientData.treatmentStatus || 'N/A', // Assuming plaintext
-          nextVisitDate: patientData.nextVisitDate
-            ? formatDateToDDMMYYYY(patientData.nextVisitDate)
-            : 'N/A',
-          nextVisitTime: patientData.nextVisitTime || 'N/A',
-          nextVisitStatus: patientData.nextVisitStatus || 'upcoming', // Add this line
-        };
-
-        setPatient(decryptedPatient);
-
-        // Fetch patient visits
-        const visitsRef = collection(
-          db,
-          'doctors',
-          doctorId,
-          'patients',
-          patientId,
-          'visits'
-        );
-        const visitsSnapshot = await getDocs(
-          query(visitsRef, orderBy('createdAt', 'desc'))
-        );
-
-        const fetchedVisits = visitsSnapshot.docs.map((visitDoc) => {
-          const visitData = visitDoc.data();
-
-          // Handle possible undefined fields
-          const visitStatus = visitData.visitStatus
-            ? decryptData(visitData.visitStatus)
-            : 'N/A';
-          const treatmentStatus = visitData.treatmentStatus
-            ? decryptData(visitData.treatmentStatus)
-            : 'N/A';
-
-          // Parse medicines JSON string
-          let medicines = [];
-          try {
-            medicines = JSON.parse(decryptData(visitData.medicines || '[]'));
-          } catch (error) {
-            console.error('Error parsing medicines:', error);
-            medicines = [];
+        try {
+          if (!session || !session.user || !session.user.id) {
+            setError('User session not found.');
+            setIsLoading(false);
+            return;
           }
 
-          return {
-            id: visitDoc.id,
-            visitDate: visitData.visitDate
-              ? formatDateToDDMMYYYY(visitData.visitDate)
+          const patientId = searchParams.get('patientId');
+          if (!patientId) {
+            setError('No patient selected.');
+            setIsLoading(false);
+            return;
+          }
+
+          const doctorId = session.user.id;
+
+          // Fetch patient details
+          const patientRef = doc(db, 'doctors', doctorId, 'patients', patientId);
+          const patientSnap = await getDoc(patientRef);
+
+          if (!patientSnap.exists()) {
+            setError('Patient not found.');
+            setIsLoading(false);
+            return;
+          }
+
+          const patientData = patientSnap.data();
+
+          const decryptedPatient = {
+            id: patientSnap.id,
+            name: decryptData(patientData.name),
+            address: decryptData(patientData.address),
+            email: decryptData(patientData.email || 'Not Provided'),
+            phone: decryptData(patientData.mobileNumber || 'Not Provided'),
+            age: decryptData(patientData.age || 'N/A'),
+            gender: decryptData(patientData.gender || 'N/A'),
+            disease: decryptData(patientData.disease || 'N/A'),
+            notes: decryptData(patientData.notes || 'N/A'),
+            treatmentStatus: patientData.treatmentStatus || 'N/A', // Assuming plaintext
+            nextVisitDate: patientData.nextVisitDate
+              ? formatDateToDDMMYYYY(patientData.nextVisitDate)
               : 'N/A',
-            visitTime: visitData.visitTime || 'N/A',
-            visitReason: visitData.visitReason || 'N/A',
-            symptoms: decryptData(visitData.symptoms || 'N/A'),
-            notes: decryptData(visitData.notes || 'N/A'),
-            amountPaid: visitData.amountPaid || '0',
-            totalAmount: visitData.totalAmount || '0',
-            treatmentStatus: treatmentStatus,
-            visitStatus: visitStatus,
-            visitNumber: visitData.visitNumber || 'N/A',
-            missedCount: visitData.missedCount || 0,
-            medicines: medicines, // Array of medicines
-            createdAt: visitData.createdAt
-              ? visitData.createdAt.toDate()
-              : new Date(),
+            nextVisitTime: patientData.nextVisitTime || 'N/A',
+            nextVisitStatus: patientData.nextVisitStatus || 'upcoming', // Add this line
           };
-        });
 
-        setVisits(fetchedVisits);
-      } catch (err) {
-        console.error('Error fetching patient data:', err);
-        setError('An error occurred while fetching patient data.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+          setPatient(decryptedPatient);
 
-    fetchData();
-  }, [session, searchParams]);
+          // Fetch patient visits
+          const visitsRef = collection(
+            db,
+            'doctors',
+            doctorId,
+            'patients',
+            patientId,
+            'visits'
+          );
+          const visitsSnapshot = await getDocs(
+            query(visitsRef, orderBy('createdAt', 'desc'))
+          );
+
+          const fetchedVisits = visitsSnapshot.docs.map((visitDoc) => {
+            const visitData = visitDoc.data();
+
+            // Handle possible undefined fields
+            const visitStatus = visitData.visitStatus
+              ? decryptData(visitData.visitStatus)
+              : 'N/A';
+            const treatmentStatus = visitData.treatmentStatus
+              ? decryptData(visitData.treatmentStatus)
+              : 'N/A';
+
+            // Parse medicines JSON string
+            let medicines = [];
+            try {
+              medicines = JSON.parse(decryptData(visitData.medicines || '[]'));
+            } catch (error) {
+              console.error('Error parsing medicines:', error);
+              medicines = [];
+            }
+
+            return {
+              id: visitDoc.id,
+              visitDate: visitData.visitDate
+                ? formatDateToDDMMYYYY(visitData.visitDate)
+                : 'N/A',
+              visitTime: visitData.visitTime || 'N/A',
+              visitReason: visitData.visitReason || 'N/A',
+              symptoms: decryptData(visitData.symptoms || 'N/A'),
+              notes: decryptData(visitData.notes || 'N/A'),
+              amountPaid: visitData.amountPaid || '0',
+              totalAmount: visitData.totalAmount || '0',
+              treatmentStatus: treatmentStatus,
+              visitStatus: visitStatus,
+              visitNumber: visitData.visitNumber || 'N/A',
+              missedCount: visitData.missedCount || 0,
+              medicines: medicines, // Array of medicines
+              createdAt: visitData.createdAt
+                ? visitData.createdAt.toDate()
+                : new Date(),
+            };
+          });
+
+          setVisits(fetchedVisits);
+        } catch (err) {
+          console.error('Error fetching patient data:', err);
+          setError('An error occurred while fetching patient data.');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      fetchData();
+    }
+  }, [status, session, router, searchParams]);
 
   // Apply Sorting and Filtering
   useEffect(() => {
@@ -286,6 +305,18 @@ const SearchResultPage = () => {
 
   return (
     <div className="p-6 bg-gradient-to-r from-blue-100 to-blue-200 dark:bg-gradient-to-r dark:from-gray-800 dark:to-gray-900 min-h-screen">
+      <div className="flex items-center mb-8">
+        {/* Back to Dashboard Button */}
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="flex items-center text-blue-700 dark:text-blue-300 hover:text-blue-500 dark:hover:text-blue-400"
+          aria-label="Back to Dashboard"
+        >
+          <FiArrowLeft className="mr-2 text-xl" />
+          Back to Dashboard
+        </button>
+      </div>
+
       <h2 className="text-4xl font-bold mb-8 text-center text-blue-800 dark:text-blue-300">
         Search Results
       </h2>
@@ -357,7 +388,7 @@ const SearchResultPage = () => {
               <p className="flex items-center text-green-700 dark:text-green-300 mt-1">
                 <FiPhone className="mr-2 text-green-600 dark:text-green-200" />
                 {patient.phone}
-              </p>
+              </p>  
               {/* Next Visit Information */}
               {patient.nextVisitDate !== 'N/A' && patient.nextVisitTime !== 'N/A' && (
                 <p className="flex items-center text-green-700 dark:text-green-300 mt-1">
@@ -575,6 +606,15 @@ const SearchResultPage = () => {
       </Modal>
     </div>
   );
-}; // <-- Ensure the closing brace is present
+};
+
+// Wrap the content with ProtectedRoute
+const SearchResultPage = () => {
+  return (
+    <ProtectedRoute>
+      <SearchResultPageContent />
+    </ProtectedRoute>
+  );
+};
 
 export default SearchResultPage;
