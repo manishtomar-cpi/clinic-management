@@ -4,12 +4,19 @@
 
 import { useState } from 'react';
 import { db } from '../../db';
-import { collection, addDoc } from 'firebase/firestore';
-import { encryptData } from '../../lib/encryption';
+import {
+  collection,
+  addDoc,
+  query,
+  where,
+  getDocs,
+} from 'firebase/firestore';
+import { encryptData, decryptData } from '../../lib/encryption';
 import { useSession } from 'next-auth/react';
 import { showToast } from './Toast';
 import { FaUserPlus } from 'react-icons/fa';
 import Tooltip from './Tooltip';
+import bcrypt from 'bcryptjs';
 
 const AddPatient = () => {
   const { data: session } = useSession();
@@ -24,7 +31,12 @@ const AddPatient = () => {
     disease: '',
     notes: '',
   });
+  const [patientCredentials, setPatientCredentials] = useState({
+    username: '',
+    password: '',
+  });
   const [errors, setErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false); // Added state for spinner
 
   const handleChange = (e) => {
     setPatientData({
@@ -67,6 +79,8 @@ const AddPatient = () => {
         newErrors.email = 'Please enter a valid email address';
         valid = false;
       }
+    } else if (step === 3) {
+      // Add any validation for step 3 if necessary
     }
     setErrors(newErrors);
     return valid;
@@ -80,11 +94,52 @@ const AddPatient = () => {
 
   const prevStep = () => setStep(step - 1);
 
+  const generateRandomUsername = () => {
+    const randomNum = Math.floor(1000 + Math.random() * 9000); // Random 4-digit number
+    const namePart = patientData.name.split(' ')[0].toLowerCase(); // Use first name
+    return `${namePart}${randomNum}`;
+  };
+
+  const generateRandomPassword = () => {
+    const chars =
+      'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
+  const checkUsernameExists = async (username) => {
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('username', '==', username));
+    const querySnapshot = await getDocs(q);
+    return !querySnapshot.empty;
+  };
+
+  const generateCredentials = async () => {
+    let unique = false;
+    let username = '';
+    const password = generateRandomPassword();
+
+    while (!unique) {
+      username = generateRandomUsername();
+      const usernameExists = await checkUsernameExists(username);
+      if (!usernameExists) {
+        unique = true;
+      }
+    }
+
+    setPatientCredentials({ username, password });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true); // Start spinner
 
     // Validate the final step
     if (!validateStep()) {
+      setIsSubmitting(false);
       return;
     }
 
@@ -101,7 +156,67 @@ const AddPatient = () => {
         treatmentStatus: 'Ongoing', // Store as plaintext
         createdAt: new Date(),
       });
-      showToast('Patient added successfully!', 'success');
+
+      // Hash the patient's password
+      const hashedPassword = await bcrypt.hash(
+        patientCredentials.password,
+        10
+      );
+
+      // Add patient's credentials to 'users' collection
+      await addDoc(collection(db, 'users'), {
+        username: patientCredentials.username,
+        password: hashedPassword,
+        email: patientData.email, // Store email as plaintext for communication
+        role: 'patient', // Add a role field to distinguish between doctors and patients
+        createdAt: new Date(),
+        doctorId: doctorId, // Link the patient to the doctor
+      });
+
+      // Fetch doctor's data from 'users' collection
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('username', '==', session.user.username));
+      const querySnapshot = await getDocs(q);
+      let doctorData = null;
+
+      if (!querySnapshot.empty) {
+        doctorData = querySnapshot.docs[0].data();
+      } else {
+        showToast('Error fetching doctor data', 'error');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Decrypt doctor's data
+      const doctorName = decryptData(doctorData.doctorName);
+      const clinicName = decryptData(doctorData.clinicName);
+      const clinicAddress = decryptData(doctorData.clinicLocation);
+
+      // Send email to patient
+      const response = await fetch('/api/sendPatientEmail', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          toEmail: patientData.email,
+          doctorName,
+          clinicName,
+          clinicAddress,
+          username: patientCredentials.username,
+          password: patientCredentials.password,
+          patientName: patientData.name,
+        }),
+      });
+
+      const emailResult = await response.json();
+
+      if (response.ok) {
+        showToast('Patient added and email sent successfully!', 'success');
+      } else {
+        showToast('Patient added, but failed to send email.', 'error');
+      }
+
       // Reset form
       setPatientData({
         name: '',
@@ -113,10 +228,16 @@ const AddPatient = () => {
         disease: '',
         notes: '',
       });
+      setPatientCredentials({
+        username: '',
+        password: '',
+      });
       setStep(1);
     } catch (error) {
       console.error('Error adding patient:', error);
       showToast('Error adding patient. Please try again.', 'error');
+    } finally {
+      setIsSubmitting(false); // Stop spinner
     }
   };
 
@@ -150,9 +271,19 @@ const AddPatient = () => {
             <StepThree
               patientData={patientData}
               handleChange={handleChange}
+              nextStep={nextStep}
+              prevStep={prevStep}
+              errors={errors}
+            />
+          )}
+          {step === 4 && (
+            <StepFour
+              patientData={patientData}
+              patientCredentials={patientCredentials}
+              generateCredentials={generateCredentials}
               prevStep={prevStep}
               handleSubmit={handleSubmit}
-              errors={errors}
+              isSubmitting={isSubmitting} // Pass isSubmitting to StepFour
             />
           )}
         </form>
@@ -166,7 +297,7 @@ const ProgressBar = ({ step }) => {
     <div className="relative h-2 bg-gray-300 rounded-full mb-8 overflow-hidden">
       <div
         className="absolute left-0 top-0 h-full bg-indigo-600 transition-all duration-300"
-        style={{ width: `${(step / 3) * 100}%` }}
+        style={{ width: `${(step / 4) * 100}%` }}
       ></div>
     </div>
   );
@@ -261,7 +392,7 @@ const StepTwo = ({ patientData, handleChange, nextStep, prevStep, errors }) => (
   </>
 );
 
-const StepThree = ({ patientData, handleChange, prevStep, handleSubmit, errors }) => (
+const StepThree = ({ patientData, handleChange, nextStep, prevStep, errors }) => (
   <>
     <InputField
       label="Disease/Condition"
@@ -323,10 +454,93 @@ const StepThree = ({ patientData, handleChange, prevStep, handleSubmit, errors }
         Back
       </button>
       <button
-        type="submit"
-        className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700"
+        type="button"
+        onClick={nextStep}
+        className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700"
       >
-        Submit
+        Next
+      </button>
+    </div>
+  </>
+);
+
+const StepFour = ({
+  patientData,
+  patientCredentials,
+  generateCredentials,
+  prevStep,
+  handleSubmit,
+  isSubmitting,
+}) => (
+  <>
+    <div className="mt-6 p-4 bg-white rounded shadow">
+      <h3 className="text-xl font-bold mb-4 text-indigo-600">Create Patient Credentials</h3>
+      {patientCredentials.username && patientCredentials.password ? (
+        <>
+          <p>
+            <strong>Username:</strong> {patientCredentials.username}
+          </p>
+          <p>
+            <strong>Password:</strong> {patientCredentials.password}
+          </p>
+          <button
+            type="button"
+            onClick={generateCredentials}
+            className="bg-yellow-600 text-white py-2 px-4 rounded mt-4 hover:bg-yellow-700"
+          >
+            Regenerate Credentials
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={generateCredentials}
+          className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700"
+        >
+          Generate Credentials
+        </button>
+      )}
+    </div>
+    <div className="flex justify-between mt-6">
+      <button
+        type="button"
+        onClick={prevStep}
+        className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600"
+      >
+        Back
+      </button>
+      <button
+        type="submit"
+        className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 flex items-center justify-center"
+        disabled={!patientCredentials.username || !patientCredentials.password || isSubmitting}
+      >
+        {isSubmitting ? (
+          <>
+            <svg
+              className="animate-spin h-5 w-5 mr-3 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v8H4z"
+              ></path>
+            </svg>
+            Sending...
+          </>
+        ) : (
+          'Submit and Send Email'
+        )}
       </button>
     </div>
   </>
