@@ -2,11 +2,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation'; // For accessing query parameters
+import { useSearchParams } from 'next/navigation'; 
 import { db } from '../../db';
 import { doc, getDoc, collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from 'next/navigation'; 
 import { decryptData } from '../../lib/encryption';
 import {
   FiUser,
