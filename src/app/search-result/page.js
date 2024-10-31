@@ -26,18 +26,14 @@ import Modal from 'react-modal';
 import Timeline from '../components/Timeline'; 
 import ProtectedRoute from '../components/ProtectedRoute';
 
-// ... [rest of the imports and helper functions]
 
-// Helper function to format date from yyyy-MM-dd to dd--mm--yyyy
 const formatDateToDDMMYYYY = (dateStr) => {
   if (!dateStr) return '';
   const [year, month, day] = dateStr.split('-');
   return `${day}-${month}-${year}`;
 };
 
-// Inside SearchResultPageContent component
 
-// Custom Styles for Modal
 const customStyles = {
     content: {
       top: '50%',
@@ -48,8 +44,8 @@ const customStyles = {
       transform: 'translate(-50%, -50%)',
       width: '90%',
       maxWidth: '600px',
-      maxHeight: '80vh', // Prevents the modal from exceeding 80% of the viewport height
-      overflowY: 'auto', // Adds scroll if content is too large
+      maxHeight: '80vh',
+      overflowY: 'auto', 
       borderRadius: '1.5rem',
       padding: '2rem',
       background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
@@ -61,9 +57,9 @@ const customStyles = {
     },
   };
   
-// Reusable Function to Render Status Badges
+
 const renderStatusBadge = (status) => {
-  if (!status) return null; // Handle undefined status
+  if (!status) return null; 
 
   let colorClasses;
   let Icon;
@@ -109,8 +105,8 @@ const SearchResultPageContent = () => {
   const [selectedVisit, setSelectedVisit] = useState(null);
 
   // Sorting and Filtering States
-  const [sortOrder, setSortOrder] = useState('newest'); // 'newest' or 'oldest'
-  const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'completed', 'missed', 'upcoming', etc.
+  const [sortOrder, setSortOrder] = useState('newest'); 
+  const [filterStatus, setFilterStatus] = useState('all'); 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   // Set the app element for React Modal
@@ -127,7 +123,7 @@ const SearchResultPageContent = () => {
       return;
     }
     if (status === 'unauthenticated') {
-      router.push('/login'); // Redirect to login if not authenticated
+      router.push('/login'); 
       return;
     }
     if (status === 'authenticated') {
@@ -177,12 +173,12 @@ const SearchResultPageContent = () => {
             gender: decryptData(patientData.gender || 'N/A'),
             disease: decryptData(patientData.disease || 'N/A'),
             notes: decryptData(patientData.notes || 'N/A'),
-            treatmentStatus: patientData.treatmentStatus || 'N/A', // Assuming plaintext
-            nextVisitDate: patientData.nextVisitDate
-              ? formatDateToDDMMYYYY(patientData.nextVisitDate)
+            treatmentStatus: patientData.treatmentStatus || 'N/A', 
+            nextVisitDate: patientData.visitDate
+              ? formatDateToDDMMYYYY(patientData.visitDate)
               : 'N/A',
-            nextVisitTime: patientData.nextVisitTime || 'N/A',
-            nextVisitStatus: patientData.nextVisitStatus || 'upcoming', // Add this line
+            nextVisitTime: patientData.visitTime || 'N/A',
+            nextVisitStatus: patientData.visitStatus || 'upcoming', // Add this line
           };
 
           setPatient(decryptedPatient);
