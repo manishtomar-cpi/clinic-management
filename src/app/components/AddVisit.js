@@ -1,4 +1,4 @@
-// src/components/AddVisit.js
+// src/app/components/AddVisit.js
 
 'use client';
 
@@ -13,13 +13,23 @@ import {
   doc,
   getDoc,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 import { encryptData, decryptData } from '../../lib/encryption';
 import { useSession } from 'next-auth/react';
 import { showToast } from './Toast';
 import Select from 'react-select';
-import { FaNotesMedical } from 'react-icons/fa';
-import { FaCheckCircle, FaTimesCircle, FaClock, FaHeartbeat } from 'react-icons/fa'; // Imported additional icons for Visit Status
+import {
+  FaNotesMedical,
+  FaPlus,
+  FaTrash,
+  FaSpinner,
+  FaClock,
+  FaHeartbeat,
+  FaTimesCircle,
+  FaCheckCircle,
+} from 'react-icons/fa';
+import { useRouter } from 'next/navigation';
 
 // Helper function to format dates from 'yyyy-mm-dd' to 'dd-mm-yyyy'
 const formatDateForStorage = (dateStr) => {
@@ -30,9 +40,9 @@ const formatDateForStorage = (dateStr) => {
 
 // Mapping of visit statuses to their corresponding background colors
 const visitStatusStyles = {
-  'Upcoming': 'bg-yellow-100',
-  'Rescheduled': 'bg-blue-100',
-  'Missed': 'bg-red-100',
+  Upcoming: 'bg-yellow-100',
+  Rescheduled: 'bg-blue-100',
+  Missed: 'bg-red-100',
   'Rescheduled but Missed': 'bg-orange-100',
 };
 
@@ -43,13 +53,13 @@ const AddVisit = () => {
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [visitData, setVisitData] = useState({
     visitDate: '',
-    visitTime: '', // Added
+    visitTime: '',
     visitReason: '',
     symptoms: '',
-    medicineGiven: '', // Renamed from 'diagnosis'
+    medicines: [], // Array to hold medicines with timings
     treatmentStatus: '',
     nextVisitDate: '',
-    nextVisitTime: '', // Added
+    nextVisitTime: '',
     totalAmount: '',
     amountPaid: '',
     notes: '',
@@ -57,8 +67,13 @@ const AddVisit = () => {
   const [patientDetails, setPatientDetails] = useState({});
   const [remainingBalance, setRemainingBalance] = useState(0);
   const [visitHistory, setVisitHistory] = useState([]);
-  const [scheduledVisit, setScheduledVisit] = useState(null); // Renamed from upcomingVisit
+  const [scheduledVisit, setScheduledVisit] = useState(null);
   const [errors, setErrors] = useState({});
+  const [visitNumber, setVisitNumber] = useState(0); // Track visit number
+  const [isSubmitting, setIsSubmitting] = useState(false); // Submit button spinner
+  const [isSendingEmail, setIsSendingEmail] = useState(false); // Send Email button spinner
+  const [emailSent, setEmailSent] = useState(false); // Track if email has been sent
+  const router = useRouter(); // For navigation
 
   useEffect(() => {
     const fetchPatients = async () => {
@@ -69,7 +84,7 @@ const AddVisit = () => {
         }
         const doctorId = session.user.id;
         const patientsRef = collection(db, 'doctors', doctorId, 'patients');
-        const q = query(patientsRef, orderBy('name')); // Optional: Order patients by name
+        const q = query(patientsRef, orderBy('name'));
         const querySnapshot = await getDocs(q);
 
         const patientList = querySnapshot.docs
@@ -81,7 +96,7 @@ const AddVisit = () => {
               treatmentStatus: data.treatmentStatus || '',
             };
           })
-          .filter((patient) => patient.treatmentStatus !== 'Completed'); // Exclude completed patients
+          .filter((patient) => patient.treatmentStatus !== 'Completed');
 
         setPatients(patientList);
       } catch (error) {
@@ -92,7 +107,7 @@ const AddVisit = () => {
     fetchPatients();
   }, [session]);
 
-  // Fetch scheduled visit if exists, for any specified status
+  // Fetch scheduled visit if exists
   const fetchScheduledVisit = async (patientId) => {
     try {
       const doctorId = session.user.id;
@@ -135,7 +150,7 @@ const AddVisit = () => {
     setSelectedPatient(option);
     await fetchVisitHistory(option.value);
     await fetchPatientDetails(option.value);
-    await fetchScheduledVisit(option.value); // Fetch any scheduled visit, not just upcoming
+    await fetchScheduledVisit(option.value);
     setErrors({ ...errors, selectedPatient: '' });
   };
 
@@ -152,6 +167,7 @@ const AddVisit = () => {
           address: decryptData(patientData.address),
           mobileNumber: decryptData(patientData.mobileNumber),
           treatmentStatus: patientData.treatmentStatus || '',
+          email: decryptData(patientData.email), // Assuming email is encrypted
         });
       } else {
         console.error('No such patient document!');
@@ -177,22 +193,28 @@ const AddVisit = () => {
       );
       const q = query(visitsRef, orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
+      let maxVisitNumber = 0;
       const visits = [];
       let totalAmount = 0;
       let totalPaid = 0;
 
       querySnapshot.forEach((doc) => {
         const data = doc.data();
+        const currentVisitNumber = data.visitNumber || 0;
+        if (currentVisitNumber > maxVisitNumber) {
+          maxVisitNumber = currentVisitNumber;
+        }
         const visit = {
           id: doc.id,
-          visitDate: data.visitDate, // Already formatted
+          visitDate: data.visitDate,
           visitTime: data.visitTime,
           totalAmount: parseFloat(data.totalAmount || '0'),
           amountPaid: parseFloat(data.amountPaid || '0'),
-          nextVisitDate: data.nextVisitDate, // Already formatted
+          nextVisitDate: data.nextVisitDate,
           nextVisitTime: data.nextVisitTime,
           treatmentStatus: data.treatmentStatus || '',
-          visitStatus: data.visitStatus || '', // Optional: Fetch existing visitStatus if any
+          visitStatus: data.visitStatus || '',
+          visitNumber: currentVisitNumber,
         };
         totalAmount += visit.totalAmount;
         totalPaid += visit.amountPaid;
@@ -201,6 +223,7 @@ const AddVisit = () => {
 
       setVisitHistory(visits);
       setRemainingBalance(totalAmount - totalPaid);
+      setVisitNumber(maxVisitNumber + 1); // Set new visitNumber to max +1
     } catch (error) {
       console.error('Error fetching visit history:', error);
       showToast('Error fetching visit history.', 'error');
@@ -208,24 +231,70 @@ const AddVisit = () => {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setVisitData({
-      ...visitData,
-      [name]: value,
-    });
+    const { name, value, type, checked } = e.target;
+
+    if (name.startsWith('medicine_')) {
+      // Handle medicine inputs
+      const [_, field, index] = name.split('_'); // e.g., ['medicine', 'name', '0']
+      const idx = parseInt(index, 10);
+      const updatedMedicines = [...visitData.medicines];
+      
+      if (!updatedMedicines[idx]) {
+        // If the medicine at this index doesn't exist, initialize it
+        updatedMedicines[idx] = { name: '', timings: { morning: false, afternoon: false, night: false } };
+      }
+
+      if (field === 'name') {
+        updatedMedicines[idx].name = value;
+      } else if (field === 'timing') {
+        updatedMedicines[idx].timings[value] = checked;
+      }
+
+      setVisitData({
+        ...visitData,
+        medicines: updatedMedicines,
+      });
+    } else {
+      setVisitData({
+        ...visitData,
+        [name]: value,
+      });
+
+      // Disable next visit date and time if treatment status is 'Completed'
+      if (name === 'treatmentStatus' && value === 'Completed') {
+        setVisitData((prevData) => ({
+          ...prevData,
+          nextVisitDate: '',
+          nextVisitTime: '',
+        }));
+      }
+    }
+
     setErrors({
       ...errors,
       [name]: '',
     });
+  };
 
-    // Disable next visit date and time if treatment status is 'Completed'
-    if (name === 'treatmentStatus' && value === 'Completed') {
-      setVisitData((prevData) => ({
-        ...prevData,
-        nextVisitDate: '',
-        nextVisitTime: '',
-      }));
-    }
+  // Handle adding medicines
+  const handleAddMedicine = () => {
+    setVisitData({
+      ...visitData,
+      medicines: [
+        ...visitData.medicines,
+        { name: '', timings: { morning: false, afternoon: false, night: false } },
+      ],
+    });
+  };
+
+  // Handle removing a medicine
+  const handleRemoveMedicine = (index) => {
+    const updatedMedicines = [...visitData.medicines];
+    updatedMedicines.splice(index, 1);
+    setVisitData({
+      ...visitData,
+      medicines: updatedMedicines,
+    });
   };
 
   const validateStep = () => {
@@ -250,9 +319,25 @@ const AddVisit = () => {
         newErrors.visitReason = 'Please enter the reason for the visit';
         valid = false;
       }
-      if (!visitData.medicineGiven.trim()) { // Changed from 'diagnosis' to 'medicineGiven'
-        newErrors.medicineGiven = 'Medicine given is required';
+      if (visitData.medicines.length === 0) {
+        newErrors.medicines = 'Please add at least one medicine';
         valid = false;
+      } else {
+        visitData.medicines.forEach((med, index) => {
+          if (!med.name.trim()) {
+            newErrors[`medicine_name_${index}`] = 'Medicine name is required';
+            valid = false;
+          }
+          if (
+            !med.timings.morning &&
+            !med.timings.afternoon &&
+            !med.timings.night
+          ) {
+            newErrors[`medicine_timing_${index}`] =
+              'Select at least one timing';
+            valid = false;
+          }
+        });
       }
     } else if (step === 3) {
       if (!visitData.treatmentStatus) {
@@ -312,12 +397,13 @@ const AddVisit = () => {
     return remainingBalance + totalAmount - amountPaid;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  // Function to submit the visit (without sending email)
+  const handleSubmitVisit = async () => {
     if (!validateStep()) {
       return;
     }
+
+    setIsSubmitting(true); // Start spinner for Submit Visit
 
     // Prepare data to store
     const dataToStore = {};
@@ -329,11 +415,12 @@ const AddVisit = () => {
       'totalAmount',
       'amountPaid',
       'visitReason',
+      'visitNumber',
     ];
     // Encrypt the rest
     for (const key in visitData) {
       if (plaintextFields.includes(key)) {
-        if (key === 'visitDate') {
+        if (key === 'visitDate' || key === 'nextVisitDate') {
           dataToStore[key] = formatDateForStorage(visitData[key]);
         } else {
           dataToStore[key] = visitData[key];
@@ -343,11 +430,20 @@ const AddVisit = () => {
         if (key === 'nextVisitDate' || key === 'nextVisitTime') {
           continue;
         }
-        dataToStore[key] = encryptData(visitData[key]);
+        if (key === 'medicines') {
+          // Serialize the medicines array before encryption
+          dataToStore[key] = encryptData(JSON.stringify(visitData[key]));
+        } else {
+          // Ensure that we pass a string to encryptData
+          dataToStore[key] = encryptData(visitData[key] || '');
+        }
       }
     }
 
-    // **Added**: Automatically set visitStatus to 'Completed' for current visit
+    // Add visitNumber
+    dataToStore['visitNumber'] = visitNumber;
+
+    // Set visitStatus to 'Completed' for current visit
     dataToStore['visitStatus'] = 'Completed';
 
     try {
@@ -374,7 +470,7 @@ const AddVisit = () => {
         const scheduledVisitData = {
           visitDate: formatDateForStorage(visitData.nextVisitDate),
           visitTime: visitData.nextVisitTime,
-          visitStatus: 'Upcoming', // Default to 'Upcoming'; can be adjusted as needed
+          visitStatus: 'Upcoming',
           createdAt: new Date(),
         };
 
@@ -395,14 +491,7 @@ const AddVisit = () => {
         } else {
           // Add new scheduled visit
           await addDoc(
-            collection(
-              db,
-              'doctors',
-              doctorId,
-              'patients',
-              patientId,
-              'visits'
-            ),
+            collection(db, 'doctors', doctorId, 'patients', patientId, 'visits'),
             scheduledVisitData
           );
         }
@@ -410,39 +499,120 @@ const AddVisit = () => {
 
       showToast('Visit added successfully!', 'success');
       // Reset form
-      setVisitData({
-        visitDate: '',
-        visitTime: '',
-        visitReason: '',
-        symptoms: '',
-        medicineGiven: '', // Reset 'medicineGiven'
-        treatmentStatus: '',
-        nextVisitDate: '',
-        nextVisitTime: '',
-        totalAmount: '',
-        amountPaid: '',
-        notes: '',
-      });
-      setStep(1);
-      setSelectedPatient(null);
-      setVisitHistory([]);
-      setScheduledVisit(null);
-      setRemainingBalance(0);
+      resetForm();
     } catch (error) {
       console.error('Error adding visit:', error);
       showToast('Error adding visit. Please try again.', 'error');
+    } finally {
+      setIsSubmitting(false); // Stop spinner for Submit Visit
     }
+  };
+
+  // Function to send email to patient
+  const handleSendEmail = async () => {
+    if (!selectedPatient || !patientDetails.email) {
+      showToast('Patient email is not available.', 'error');
+      return;
+    }
+
+    if (!validateStep()) {
+      return;
+    }
+
+    setIsSendingEmail(true); // Start spinner for Send Email
+
+    try {
+      const doctorId = session.user.id;
+      const patientId = selectedPatient.value;
+
+      // Fetch doctor's data from 'users' collection
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('username', '==', session.user.username));
+      const querySnapshot = await getDocs(q);
+      let doctorData = null;
+
+      if (!querySnapshot.empty) {
+        doctorData = querySnapshot.docs[0].data();
+      } else {
+        showToast('Error fetching doctor data', 'error');
+        setIsSendingEmail(false);
+        return;
+      }
+
+      // Decrypt doctor's data
+      const doctorName = decryptData(doctorData.doctorName);
+      const clinicName = decryptData(doctorData.clinicName);
+      const clinicAddress = decryptData(doctorData.clinicLocation);
+
+      // Send email to patient with PDF attachment
+      const response = await fetch('/api/sendVisitEmail', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          toEmail: patientDetails.email,
+          doctorName,
+          clinicName,
+          clinicAddress,
+          patientName: patientDetails.name,
+          visitData,
+          visitNumber,
+        }),
+      });
+
+      if (response.ok) {
+        showToast('Email sent successfully!', 'success');
+        setEmailSent(true); // Update the emailSent state
+      } else {
+        const errorData = await response.json();
+        showToast(
+          `Failed to send email: ${errorData.message || 'Unknown error'}`,
+          'error'
+        );
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      showToast('Error sending email. Please try again.', 'error');
+    } finally {
+      setIsSendingEmail(false); // Stop spinner for Send Email
+    }
+  };
+
+  // Function to reset the form
+  const resetForm = () => {
+    setVisitData({
+      visitDate: '',
+      visitTime: '',
+      visitReason: '',
+      symptoms: '',
+      medicines: [],
+      treatmentStatus: '',
+      nextVisitDate: '',
+      nextVisitTime: '',
+      totalAmount: '',
+      amountPaid: '',
+      notes: '',
+    });
+    setStep(1);
+    setSelectedPatient(null);
+    setVisitHistory([]);
+    setScheduledVisit(null);
+    setRemainingBalance(0);
+    setVisitNumber(0);
+    setErrors({});
+    setEmailSent(false); // Reset emailSent state
   };
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-0">
       <div className="bg-gradient-to-r from-green-50 to-teal-100 p-8 rounded-lg shadow-lg w-full sm:w-11/12 md:w-10/12 lg:w-full mt-10 lg:mt-0 relative">
-        <h2 className="text-3xl font-bold mb-6 text-teal-600">
-          <FaNotesMedical className="inline-block mb-1" /> Add Patient Visit
+        <h2 className="text-3xl font-bold mb-6 text-teal-600 flex items-center justify-center">
+          <FaNotesMedical className="inline-block mb-1 mr-2" /> Add Patient Visit
         </h2>
         <ProgressBar step={step} />
 
-        <form onSubmit={handleSubmit}>
+        <form>
           {step === 1 && (
             <StepOne
               patients={patients}
@@ -451,13 +621,17 @@ const AddVisit = () => {
               nextStep={nextStep}
               errors={errors}
               patientDetails={patientDetails}
-              scheduledVisit={scheduledVisit} // Pass scheduledVisit
+              scheduledVisit={scheduledVisit}
+              visitHistory={visitHistory}
+              visitNumber={visitNumber}
             />
           )}
           {step === 2 && (
             <StepTwo
               visitData={visitData}
               handleChange={handleChange}
+              handleAddMedicine={handleAddMedicine}
+              handleRemoveMedicine={handleRemoveMedicine}
               nextStep={nextStep}
               prevStep={prevStep}
               errors={errors}
@@ -470,18 +644,23 @@ const AddVisit = () => {
               nextStep={nextStep}
               prevStep={prevStep}
               errors={errors}
-              scheduledVisit={scheduledVisit} // Pass scheduledVisit if needed
             />
           )}
           {step === 4 && (
             <StepFour
               visitData={visitData}
               prevStep={prevStep}
-              handleSubmit={handleSubmit}
+              handleSubmitVisit={handleSubmitVisit}
+              handleSendEmail={handleSendEmail}
               remainingBalance={remainingBalance}
               calculateNewBalance={calculateNewBalance}
               patientDetails={patientDetails}
-              scheduledVisit={scheduledVisit} // Pass scheduledVisit
+              scheduledVisit={scheduledVisit}
+              visitNumber={visitNumber}
+              visitHistory={visitHistory}
+              isSubmitting={isSubmitting}
+              isSendingEmail={isSendingEmail}
+              emailSent={emailSent}
             />
           )}
         </form>
@@ -514,6 +693,8 @@ const StepOne = ({
   errors,
   patientDetails,
   scheduledVisit,
+  visitHistory,
+  visitNumber,
 }) => {
   // Function to get the appropriate background color based on visitStatus
   const getScheduledVisitStyle = (status) => {
@@ -555,11 +736,15 @@ const StepOne = ({
             menu: (provided) => ({ ...provided, zIndex: 9999 }),
             control: (provided) => ({
               ...provided,
-              borderColor: errors.selectedPatient ? 'red' : provided.borderColor,
+              borderColor: errors.selectedPatient
+                ? 'red'
+                : provided.borderColor,
               zIndex: 2,
             }),
           }}
-          menuPortalTarget={typeof window !== 'undefined' ? document.body : null}
+          menuPortalTarget={
+            typeof window !== 'undefined' ? document.body : null
+          }
           menuPosition="fixed"
         />
         {errors.selectedPatient && (
@@ -575,18 +760,35 @@ const StepOne = ({
             <strong>Disease:</strong> {patientDetails.disease || 'N/A'}
           </p>
           <p>
-            <strong>Treatment Status:</strong> {patientDetails.treatmentStatus || 'N/A'}
+            <strong>Treatment Status:</strong>{' '}
+            {patientDetails.treatmentStatus || 'N/A'}
           </p>
           <p>
-            <strong>Mobile Number:</strong> {patientDetails.mobileNumber || 'N/A'}
+            <strong>Mobile Number:</strong>{' '}
+            {patientDetails.mobileNumber || 'N/A'}
           </p>
           <p>
             <strong>Address:</strong> {patientDetails.address || 'N/A'}
           </p>
         </div>
       )}
+      {visitNumber > 1 && (
+        <div className="mt-4 p-4 bg-white rounded shadow">
+          <p>
+            <strong>This is visit number:</strong> {visitNumber}
+          </p>
+          <p>
+            <strong>Previous Visit Date:</strong>{' '}
+            {visitHistory[0]?.visitDate || 'N/A'}
+          </p>
+        </div>
+      )}
       {scheduledVisit && (
-        <div className={`mt-4 p-4 rounded shadow ${getScheduledVisitStyle(scheduledVisit.visitStatus)}`}>
+        <div
+          className={`mt-4 p-4 rounded shadow ${getScheduledVisitStyle(
+            scheduledVisit.visitStatus
+          )}`}
+        >
           <h3 className="text-lg font-semibold mb-2">
             {getScheduledVisitIcon(scheduledVisit.visitStatus)} Scheduled Visit
           </h3>
@@ -599,14 +801,13 @@ const StepOne = ({
           <p>
             <strong>Status:</strong> {scheduledVisit.visitStatus || 'N/A'}
           </p>
-          {/* Optionally, you can add a button or link to navigate to the scheduled visit details */}
         </div>
       )}
       <div className="flex justify-end mt-6">
         <button
           type="button"
           onClick={nextStep}
-          className="bg-teal-600 text-white py-2 px-4 rounded hover:bg-teal-700"
+          className="bg-teal-600 text-white py-2 px-4 rounded hover:bg-teal-700 flex items-center"
         >
           Next
         </button>
@@ -616,7 +817,15 @@ const StepOne = ({
 };
 
 // Step Two Component (Medical Details)
-const StepTwo = ({ visitData, handleChange, nextStep, prevStep, errors }) => (
+const StepTwo = ({
+  visitData,
+  handleChange,
+  handleAddMedicine,
+  handleRemoveMedicine,
+  nextStep,
+  prevStep,
+  errors,
+}) => (
   <>
     <InputField
       label="Visit Date"
@@ -651,27 +860,129 @@ const StepTwo = ({ visitData, handleChange, nextStep, prevStep, errors }) => (
       onChange={handleChange}
       error={errors.symptoms}
     />
-    <InputField
-      label="Medicine Given"
-      name="medicineGiven" // Changed from 'diagnosis' to 'medicineGiven'
-      type="text"
-      value={visitData.medicineGiven}
-      onChange={handleChange}
-      error={errors.medicineGiven}
-      required
-    />
+    <div className="mb-4">
+      <label className="block text-gray-700 font-semibold mb-2">
+        Medicines Prescribed
+      </label>
+      {visitData.medicines.map((med, index) => (
+        <div
+          key={index}
+          className="p-4 mb-2 border rounded bg-white relative flex flex-col sm:flex-row sm:items-start sm:justify-between"
+        >
+          <div className="flex-1">
+            <InputField
+              label={`Medicine Name`}
+              name={`medicine_name_${index}`}
+              value={med.name}
+              onChange={(e) =>
+                handleChange({
+                  target: {
+                    name: `medicine_name_${index}`,
+                    value: e.target.value,
+                  },
+                })
+              }
+              error={errors[`medicine_name_${index}`]}
+              required
+            />
+            <div className="flex items-center flex-wrap">
+              <span className="mr-2 font-semibold">Timings:</span>
+              <label className="mr-4 flex items-center">
+                <input
+                  type="checkbox"
+                  name={`medicine_timing_${index}`}
+                  value="morning"
+                  checked={med.timings.morning}
+                  onChange={(e) =>
+                    handleChange({
+                      target: {
+                        name: `medicine_timing_${index}`,
+                        value: e.target.value,
+                        checked: e.target.checked,
+                      },
+                    })
+                  }
+                  className="mr-1"
+                />
+                Morning
+              </label>
+              <label className="mr-4 flex items-center">
+                <input
+                  type="checkbox"
+                  name={`medicine_timing_${index}`}
+                  value="afternoon"
+                  checked={med.timings.afternoon}
+                  onChange={(e) =>
+                    handleChange({
+                      target: {
+                        name: `medicine_timing_${index}`,
+                        value: e.target.value,
+                        checked: e.target.checked,
+                      },
+                    })
+                  }
+                  className="mr-1"
+                />
+                Afternoon
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  name={`medicine_timing_${index}`}
+                  value="night"
+                  checked={med.timings.night}
+                  onChange={(e) =>
+                    handleChange({
+                      target: {
+                        name: `medicine_timing_${index}`,
+                        value: e.target.value,
+                        checked: e.target.checked,
+                      },
+                    })
+                  }
+                  className="mr-1"
+                />
+                Night
+              </label>
+            </div>
+            {errors[`medicine_timing_${index}`] && (
+              <p className="text-red-500 text-sm mt-1">
+                {errors[`medicine_timing_${index}`]}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => handleRemoveMedicine(index)}
+            className="mt-4 sm:mt-0 sm:ml-4 bg-red-500 text-white p-2 rounded hover:bg-red-600 flex items-center justify-center"
+          >
+            <FaTrash />
+          </button>
+        </div>
+      ))}
+      {errors.medicines && (
+        <p className="text-red-500 text-sm mt-1">{errors.medicines}</p>
+      )}
+      <button
+        type="button"
+        onClick={handleAddMedicine}
+        className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 flex items-center mt-2"
+      >
+        <FaPlus className="mr-2" /> Add Medicine
+      </button>
+    </div>
     <div className="flex justify-between mt-6">
       <button
         type="button"
         onClick={prevStep}
-        className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600"
+        className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 flex items-center"
       >
         Back
       </button>
       <button
         type="button"
         onClick={nextStep}
-        className="bg-teal-600 text-white py-2 px-4 rounded hover:bg-teal-700"
+        className="bg-teal-600 text-white py-2 px-4 rounded hover:bg-teal-700 flex items-center"
       >
         Next
       </button>
@@ -679,8 +990,14 @@ const StepTwo = ({ visitData, handleChange, nextStep, prevStep, errors }) => (
   </>
 );
 
-// Step Three Component (Financial Details)
-const StepThree = ({ visitData, handleChange, nextStep, prevStep, errors, scheduledVisit }) => (
+// Step Three Component (Treatment & Financial Details)
+const StepThree = ({
+  visitData,
+  handleChange,
+  nextStep,
+  prevStep,
+  errors,
+}) => (
   <>
     <SelectField
       label="Treatment Status"
@@ -748,14 +1065,14 @@ const StepThree = ({ visitData, handleChange, nextStep, prevStep, errors, schedu
       <button
         type="button"
         onClick={prevStep}
-        className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600"
+        className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 flex items-center"
       >
         Back
       </button>
       <button
         type="button"
         onClick={nextStep}
-        className="bg-teal-600 text-white py-2 px-4 rounded hover:bg-teal-700"
+        className="bg-teal-600 text-white py-2 px-4 rounded hover:bg-teal-700 flex items-center"
       >
         Next
       </button>
@@ -763,15 +1080,21 @@ const StepThree = ({ visitData, handleChange, nextStep, prevStep, errors, schedu
   </>
 );
 
-// Step Four Component (Review & Submit)
+// Step Four Component (Review & Actions)
 const StepFour = ({
   visitData,
   prevStep,
-  handleSubmit,
+  handleSubmitVisit,
+  handleSendEmail,
   remainingBalance,
   calculateNewBalance,
   patientDetails,
   scheduledVisit,
+  visitNumber,
+  visitHistory,
+  isSubmitting,
+  isSendingEmail,
+  emailSent,
 }) => (
   <>
     <div className="mt-6 p-4 bg-white rounded shadow">
@@ -785,6 +1108,15 @@ const StepFour = ({
         <strong>Treatment Status:</strong> {visitData.treatmentStatus}
       </p>
       <p>
+        <strong>Visit Number:</strong> {visitNumber}
+      </p>
+      {visitNumber > 1 && (
+        <p>
+          <strong>Previous Visit Date:</strong>{' '}
+          {visitHistory[0]?.visitDate || 'N/A'}
+        </p>
+      )}
+      <p>
         <strong>Date:</strong> {formatDateForStorage(visitData.visitDate)}
       </p>
       <p>
@@ -794,10 +1126,24 @@ const StepFour = ({
         <strong>Reason for Visit:</strong> {visitData.visitReason}
       </p>
       <p>
-        <strong>Medicine Given:</strong> {visitData.medicineGiven}
+        <strong>Medicines Prescribed:</strong>
       </p>
+      <ul className="list-disc list-inside">
+        {visitData.medicines.map((med, index) => (
+          <li key={index}>
+            {med.name} -{' '}
+            {[
+              med.timings.morning && 'Morning',
+              med.timings.afternoon && 'Afternoon',
+              med.timings.night && 'Night',
+            ]
+              .filter(Boolean)
+              .join(', ')}
+          </li>
+        ))}
+      </ul>
       <p>
-        <strong>Visit Status:</strong> Completed {/* **Added** Visit Status */}
+        <strong>Visit Status:</strong> Completed
       </p>
       <p>
         <strong>Total Amount:</strong> ₹{visitData.totalAmount}
@@ -826,8 +1172,12 @@ const StepFour = ({
         </p>
       )}
       {scheduledVisit && (
-        <div className={`mt-4 p-4 rounded ${visitStatusStyles[scheduledVisit.visitStatus] || 'bg-gray-100'}`}>
-          <h3 className="text-lg font-semibold mb-2 text-teal-700">Existing Scheduled Visit</h3>
+        <div
+          className={`mt-4 p-4 rounded ${visitStatusStyles[scheduledVisit.visitStatus] || 'bg-gray-100'}`}
+        >
+          <h3 className="text-lg font-semibold mb-2 text-teal-700">
+            Scheduled Visit
+          </h3>
           <p>
             <strong>Date:</strong> {scheduledVisit.visitDate || 'N/A'}
           </p>
@@ -847,17 +1197,44 @@ const StepFour = ({
       <button
         type="button"
         onClick={prevStep}
-        className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600"
+        className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 flex items-center"
       >
         Back
       </button>
-      <button
-        type="submit"
-        onClick={handleSubmit}
-        className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700"
-      >
-        Submit
-      </button>
+      <div className="flex space-x-4">
+        <button
+          type="button"
+          onClick={handleSubmitVisit}
+          className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 flex items-center"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <FaSpinner className="animate-spin mr-2" />
+          ) : (
+            <FaCheckCircle className="mr-2" />
+          )}
+          Submit Visit
+        </button>
+        <button
+          type="button"
+          onClick={handleSendEmail}
+          className={`${
+            emailSent
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-blue-600 hover:bg-blue-700'
+          } text-white py-2 px-4 rounded flex items-center`}
+          disabled={isSendingEmail || emailSent}
+        >
+          {isSendingEmail ? (
+            <FaSpinner className="animate-spin mr-2" />
+          ) : emailSent ? (
+            <FaCheckCircle className="mr-2" />
+          ) : (
+            <FaNotesMedical className="mr-2" />
+          )}
+          {emailSent ? 'Email Sent to Patient' : 'Send Email'}
+        </button>
+      </div>
     </div>
   </>
 );
