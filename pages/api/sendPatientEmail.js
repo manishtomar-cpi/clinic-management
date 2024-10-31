@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     // Configure AWS SDK
     AWS.config.update({
       accessKeyId: process.env.MY_AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.MY_AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.MY_AWS_SECRET_ACCESS_KEY, // Corrected
       region: process.env.MY_AWS_REGION,
     });
 
@@ -52,6 +52,7 @@ export default async function handler(req, res) {
 <html>
 <head>
   <style>
+    /* Your CSS Styles Here */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #f0f8ff;
@@ -133,7 +134,7 @@ export default async function handler(req, res) {
 <body>
   <div class="container">
     <div class="header">
-      <!-- You can replace the src with your ClinicEase logo URL -->
+      <!-- Replace the src with your ClinicEase logo URL -->
       <img src="https://cdn-icons-png.flaticon.com/512/2965/2965567.png" alt="ClinicEase Logo">
       <h1>ClinicEase</h1>
     </div>
