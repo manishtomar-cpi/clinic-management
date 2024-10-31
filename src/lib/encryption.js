@@ -5,7 +5,7 @@ import CryptoJS from 'crypto-js';
 const SECRET_KEY = process.env.NEXT_PUBLIC_SECRET_KEY;
 
 if (!SECRET_KEY) {
-  console.error('SECRET_KEY is not defined. Please set NEXT_PUBLIC_SECRET_KEY in your environment variables.');
+  // console.error('SECRET_KEY is not defined. Please set NEXT_PUBLIC_SECRET_KEY in your environment variables.');
 } else {
   // console.log('SECRET_KEY loaded successfully.');
 }
@@ -19,7 +19,7 @@ export const decryptData = (encryptedData) => {
   if (!encryptedData) return '';
   try {
     // Optional: Check if data is likely encrypted
-    if (!encryptedData.startsWith('U2FsdGVkX1')) { // Common prefix for CryptoJS encrypted data
+    if (!encryptedData.startsWith('U2FsdGVkX1')) { 
       // Data is not encrypted
       return encryptedData;
     }
