@@ -1,4 +1,3 @@
-// src/lib/auth.js
 
 import crypto from 'crypto';
 import CredentialsProvider from 'next-auth/providers/credentials';

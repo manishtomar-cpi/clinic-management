@@ -1,4 +1,3 @@
-// src/app/components/MedicalSpinner.js
 
 'use client';
 

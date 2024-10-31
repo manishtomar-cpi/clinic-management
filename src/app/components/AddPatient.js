@@ -1,4 +1,3 @@
-// src/components/AddPatient.js
 
 'use client';
 

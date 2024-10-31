@@ -1,4 +1,3 @@
-// src/app/components/PatientCard.js
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';

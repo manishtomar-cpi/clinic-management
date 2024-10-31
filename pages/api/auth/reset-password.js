@@ -1,4 +1,3 @@
-// pages/api/auth/reset-password.js
 
 import { db } from '../../../src/db';
 import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';

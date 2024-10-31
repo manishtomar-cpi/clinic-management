@@ -1,4 +1,3 @@
-// pages/api/auth/verify-otp.js
 
 import { verifyOtp } from '../../../src/utils/otpStore';
 

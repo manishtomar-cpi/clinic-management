@@ -1,4 +1,3 @@
-// src/app/components/Timeline.js
 
 import React from 'react';
 import { FiCheckCircle, FiClock } from 'react-icons/fi';

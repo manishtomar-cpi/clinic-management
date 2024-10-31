@@ -1,6 +1,5 @@
-// src/pages/signup.js
 
-"use client"; // Ensures that this component is rendered on the client side
+"use client"; 
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {

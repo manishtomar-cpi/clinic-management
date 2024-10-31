@@ -1,4 +1,3 @@
-// components/OSMSearch.js
 import React, { useState } from 'react';
 import axios from 'axios';
 import { FaMapMarkerAlt } from 'react-icons/fa';

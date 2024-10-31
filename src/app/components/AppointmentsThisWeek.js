@@ -1,4 +1,3 @@
-// src/app/components/AppointmentsThisWeek.js
 
 'use client';
 

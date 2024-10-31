@@ -1,4 +1,3 @@
-// pages/api/sendVisitEmail.js
 
 import AWS from 'aws-sdk';
 import pdf from 'html-pdf';

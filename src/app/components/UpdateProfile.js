@@ -1,4 +1,3 @@
-// src/app/components/UpdateProfile.js
 
 "use client";
 import React, { useState } from "react";

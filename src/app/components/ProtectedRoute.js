@@ -1,4 +1,3 @@
-// src/app/components/ProtectedRoute.js
 
 'use client';
 

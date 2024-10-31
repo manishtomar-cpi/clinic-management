@@ -1,4 +1,3 @@
-// src/pages/api/dashboard/appointments-this-week.js
 
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';

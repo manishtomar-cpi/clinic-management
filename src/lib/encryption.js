@@ -1,4 +1,3 @@
-// src/app/lib/encryption.js
 
 import CryptoJS from 'crypto-js';
 

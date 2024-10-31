@@ -1,4 +1,3 @@
-// pages/api/auth/send-otp.js
 
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { setOtp } from '../../../src/utils/otpStore';

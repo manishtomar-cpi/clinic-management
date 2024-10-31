@@ -1,4 +1,3 @@
-// src/app/components/TotalPatient.js
 
 'use client';
 

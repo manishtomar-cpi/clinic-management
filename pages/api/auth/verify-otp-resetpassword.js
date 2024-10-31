@@ -1,4 +1,3 @@
-// pages/api/auth/verify-otp-resetpassword.js
 
 import { verifyOtp, getEmailByUsername } from '../../../src/utils/otpStore';
 

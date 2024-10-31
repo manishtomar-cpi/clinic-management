@@ -1,4 +1,3 @@
-// src/app/components/AddVisit.js
 
 'use client';
 

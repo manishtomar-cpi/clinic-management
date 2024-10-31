@@ -1,4 +1,3 @@
-// src/components/PatientBalance.js
 
 'use client';
 

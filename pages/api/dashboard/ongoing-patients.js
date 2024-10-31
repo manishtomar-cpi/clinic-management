@@ -1,4 +1,3 @@
-// src/pages/api/dashboard/ongoing-patients.js
 
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';

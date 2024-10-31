@@ -1,4 +1,3 @@
-// src/components/StatsChart.js
 
 import React, { useEffect, useState } from 'react';
 import { Line, Bar } from 'react-chartjs-2';

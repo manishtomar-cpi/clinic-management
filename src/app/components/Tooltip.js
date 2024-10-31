@@ -1,4 +1,3 @@
-// src/components/Tooltip.js
 
 import { FaInfoCircle } from 'react-icons/fa';
 

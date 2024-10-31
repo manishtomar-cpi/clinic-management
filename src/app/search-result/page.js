@@ -1,4 +1,3 @@
-// src/app/search-result/page.js
 
 'use client';
 
