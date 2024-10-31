@@ -29,9 +29,9 @@ export default async function handler(req, res) {
 
     // Configure AWS SDK
     AWS.config.update({
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      region: process.env.AWS_REGION,
+      accessKeyId: process.env.MY_AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.MY_AWS_ACCESS_KEY_IDAWS_SECRET_ACCESS_KEY,
+      region: process.env.MY_AWS_REGION,
     });
 
     const ses = new AWS.SES({ apiVersion: '2010-12-01' });
