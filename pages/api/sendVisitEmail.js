@@ -1,12 +1,11 @@
+// pages/api/sendVisitEmail.js
 
 import AWS from 'aws-sdk';
-import pdf from 'html-pdf';
 import ejs from 'ejs';
 import path from 'path';
-import fs from 'fs';
-import { promisify } from 'util';
-
-const readFile = promisify(fs.readFile);
+import fs from 'fs/promises'; // Use promise-based fs
+import nodemailer from 'nodemailer';
+import puppeteer from 'puppeteer';
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
@@ -42,7 +41,7 @@ export default async function handler(req, res) {
 
     const ses = new AWS.SES({ apiVersion: '2010-12-01' });
 
-    // Generate PDF from EJS template
+    // Generate PDF from EJS template using Puppeteer
     const templatePath = path.join(
       process.cwd(),
       'templates',
@@ -51,7 +50,7 @@ export default async function handler(req, res) {
 
     try {
       // Read the EJS template
-      const template = await readFile(templatePath, 'utf-8');
+      const template = await fs.readFile(templatePath, 'utf-8');
 
       // Prepare data for the template
       const data = {
@@ -72,32 +71,26 @@ export default async function handler(req, res) {
       // Render the HTML content
       const htmlContent = ejs.render(template, data);
 
-      // Generate PDF
-      const pdfOptions = {
-        format: 'A4',
-        orientation: 'portrait',
-        border: '10mm',
-      };
-
-      const pdfBuffer = await new Promise((resolve, reject) => {
-        pdf.create(htmlContent, pdfOptions).toBuffer((err, buffer) => {
-          if (err) return reject(err);
-          else resolve(buffer);
-        });
+      // Generate PDF using Puppeteer
+      const browser = await puppeteer.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
       });
+      const page = await browser.newPage();
+      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+      });
+      await browser.close();
 
       const loginLink = 'https://clinic-ease.netlify.app/patient-login';
 
       // Construct the email parameters
-      const params = {
-        Destination: {
-          ToAddresses: [toEmail],
-        },
-        Message: {
-          Body: {
-            Html: {
-              Charset: 'UTF-8',
-              Data: `
+      const mailOptions = {
+        from: process.env.SES_FROM_EMAIL,
+        to: toEmail,
+        subject: `Your Visit Details - ${clinicName}`,
+        html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -168,11 +161,8 @@ export default async function handler(req, res) {
   </div>
 </body>
 </html>
-              `,
-            },
-            Text: {
-              Charset: 'UTF-8',
-              Data: `
+        `,
+        text: `
 Visit Details from ${clinicName}
 
 Dear ${patientName},
@@ -185,35 +175,7 @@ Login to Your Account: ${loginLink}
 
 Best regards,
 ${clinicName} Team
-              `,
-            },
-          },
-          Subject: {
-            Charset: 'UTF-8',
-            Data: `Your Visit Details - ${clinicName}`,
-          },
-        },
-        Source: process.env.SES_FROM_EMAIL,
-      };
-
-      // Since AWS SES's sendRawEmail requires a properly formatted raw email with attachments,
-      // we'll construct a MIME message.
-
-      // Import the `nodemailer` library to help construct the raw email
-      const nodemailer = require('nodemailer');
-
-      // Create a Nodemailer transporter using SES
-      const transporter = nodemailer.createTransport({
-        SES: ses,
-      });
-
-      // Prepare the email options
-      const mailOptions = {
-        from: process.env.SES_FROM_EMAIL,
-        to: toEmail,
-        subject: `Your Visit Details - ${clinicName}`,
-        html: params.Message.Body.Html.Data,
-        text: params.Message.Body.Text.Data,
+        `,
         attachments: [
           {
             filename: 'VisitDetails.pdf',
@@ -222,6 +184,11 @@ ${clinicName} Team
           },
         ],
       };
+
+      // Create a Nodemailer transporter using SES
+      const transporter = nodemailer.createTransport({
+        SES: ses,
+      });
 
       // Send the email using Nodemailer
       await transporter.sendMail(mailOptions);
