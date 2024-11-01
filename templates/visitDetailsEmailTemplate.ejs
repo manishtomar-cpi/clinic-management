@@ -17,6 +17,7 @@
       border: 1px solid #dddddd;
       max-width: 600px;
       margin: auto;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     .header {
       background-color: #1e90ff;
@@ -25,6 +26,18 @@
       text-align: center;
       border-top-left-radius: 10px;
       border-top-right-radius: 10px;
+      position: relative;
+    }
+    .header img {
+      width: 50px;
+      height: 50px;
+      position: absolute;
+      top: 15px;
+      left: 15px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
     }
     .content {
       padding: 20px;
@@ -48,6 +61,10 @@
       margin-top: 20px;
       border-radius: 5px;
       font-weight: bold;
+      transition: background-color 0.3s ease;
+    }
+    .button:hover {
+      background-color: #28a745;
     }
     table {
       width: 100%;
@@ -69,12 +86,35 @@
       color: #1e90ff;
       border-bottom: 2px solid #dddddd;
       padding-bottom: 5px;
+      margin-bottom: 10px;
+    }
+    .timings {
+      display: flex;
+      gap: 10px;
+      margin-top: 5px;
+    }
+    .timing-label {
+      background-color: #e0f7fa;
+      color: #006064;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+    }
+    .motivational {
+      background-color: #fff3cd;
+      color: #856404;
+      padding: 15px;
+      border-left: 5px solid #ffeeba;
+      border-radius: 5px;
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      <!-- Optional: Add your clinic's logo -->
+      <!-- <img src="https://yourclinic.com/logo.png" alt="Clinic Logo" /> -->
       <h1>ClinicEase</h1>
     </div>
     <div class="content">
@@ -90,6 +130,7 @@
         <p><strong>Time:</strong> <%= visitData.visitTime %></p>
         <p><strong>Reason for Visit:</strong> <%= visitData.visitReason %></p>
         <p><strong>Symptoms Observed:</strong> <%= visitData.symptoms %></p>
+        <!-- Removed Disease Information -->
       </div>
 
       <div class="section">
@@ -99,16 +140,24 @@
             <thead>
               <tr>
                 <th>Medicine Name</th>
-                <th>Dosage</th>
-                <th>Frequency</th>
+                <th>Timings</th>
               </tr>
             </thead>
             <tbody>
               <% visitData.medicines.forEach(function(med) { %>
                 <tr>
                   <td><%= med.name %></td>
-                  <td><%= med.dosage %></td>
-                  <td><%= med.frequency %></td>
+                  <td>
+                    <% 
+                      const timingLabels = [];
+                      if (med.timings.morning) timingLabels.push('Morning');
+                      if (med.timings.afternoon) timingLabels.push('Afternoon');
+                      if (med.timings.night) timingLabels.push('Night');
+                    %>
+                    <% timingLabels.forEach(function(timing, index) { %>
+                      <span class="timing-label"><%= timing %></span>
+                    <% }); %>
+                  </td>
                 </tr>
               <% }); %>
             </tbody>
@@ -138,6 +187,13 @@
         <% } else { %>
           <p>No next visit scheduled.</p>
         <% } %>
+      </div>
+
+      <div class="motivational">
+        <p>
+          🌟 <strong>Stay Positive and Keep Up the Good Work!</strong> 🌟<br/>
+          Remember, consistent care and a positive mindset are key to your well-being. We're here to support you every step of the way.
+        </p>
       </div>
 
       <p>You can also log in to your account to track your treatment progress.</p>

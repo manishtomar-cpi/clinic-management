@@ -1192,49 +1192,48 @@ const StepFour = ({
         </div>
       )}
     </div>
-    <div className="flex justify-between mt-6">
-      <button
-        type="button"
-        onClick={prevStep}
-        className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 flex items-center"
-      >
-        Back
-      </button>
-      <div className="flex space-x-4">
-        <button
-          type="button"
-          onClick={handleSubmitVisit}
-          className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 flex items-center"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <FaSpinner className="animate-spin mr-2" />
-          ) : (
-            <FaCheckCircle className="mr-2" />
-          )}
-          Submit Visit
-        </button>
-        <button
-          type="button"
-          onClick={handleSendEmail}
-          className={`${
-            emailSent
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 hover:bg-blue-700'
-          } text-white py-2 px-4 rounded flex items-center`}
-          disabled={isSendingEmail || emailSent}
-        >
-          {isSendingEmail ? (
-            <FaSpinner className="animate-spin mr-2" />
-          ) : emailSent ? (
-            <FaCheckCircle className="mr-2" />
-          ) : (
-            <FaNotesMedical className="mr-2" />
-          )}
-          {emailSent ? 'Email Sent to Patient' : 'Send Email'}
-        </button>
-      </div>
-    </div>
+    <div className="flex flex-col space-y-4 mt-6">
+  <button
+    type="button"
+    onClick={prevStep}
+    className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600 flex items-center"
+  >
+    Back
+  </button>
+  <button
+    type="button"
+    onClick={handleSubmitVisit}
+    className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 flex items-center"
+    disabled={isSubmitting}
+  >
+    {isSubmitting ? (
+      <FaSpinner className="animate-spin mr-2" />
+    ) : (
+      <FaCheckCircle className="mr-2" />
+    )}
+    Submit Visit
+  </button>
+  <button
+    type="button"
+    onClick={handleSendEmail}
+    className={`${
+      emailSent
+        ? 'bg-gray-400 cursor-not-allowed'
+        : 'bg-blue-600 hover:bg-blue-700'
+    } text-white py-2 px-4 rounded flex items-center`}
+    disabled={isSendingEmail || emailSent}
+  >
+    {isSendingEmail ? (
+      <FaSpinner className="animate-spin mr-2" />
+    ) : emailSent ? (
+      <FaCheckCircle className="mr-2" />
+    ) : (
+      <FaNotesMedical className="mr-2" />
+    )}
+    {emailSent ? 'Email Sent to Patient' : 'Send Email to Patient'}
+  </button>
+</div>
+
   </>
 );
 

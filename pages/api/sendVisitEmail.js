@@ -16,7 +16,11 @@ export default async function handler(req, res) {
       patientName,
       visitData,
       visitNumber,
+      // Removed patientDetails
     } = req.body;
+
+    // Debugging: Log the incoming request body
+    console.log('Received POST data:', req.body);
 
     // Input validation
     if (
@@ -27,6 +31,7 @@ export default async function handler(req, res) {
       !patientName ||
       !visitData ||
       !visitNumber
+      // Removed patientDetails validation
     ) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
@@ -65,6 +70,7 @@ export default async function handler(req, res) {
             ? formatDateForDisplay(visitData.nextVisitDate)
             : '',
         },
+        // Removed patientDetails
         loginLink: 'https://clinic-ease.netlify.app/patient-login',
       };
 
@@ -77,40 +83,7 @@ export default async function handler(req, res) {
         to: toEmail,
         subject: `Your Visit Details - ${clinicName}`,
         html: htmlContent,
-        text: `
-Visit Details from ${clinicName}
-
-Dear ${patientName},
-
-Thank you for visiting ${clinicName}. Below are the details of your recent visit.
-
-Doctor: Dr. ${doctorName}
-Clinic: ${clinicName}
-Clinic Address: ${clinicAddress}
-Visit Number: ${visitNumber}
-Date: ${visitData.visitDate}
-Time: ${visitData.visitTime}
-Reason for Visit: ${visitData.visitReason}
-Symptoms Observed: ${visitData.symptoms}
-
-${visitData.medicines && visitData.medicines.length > 0 ? 'Medicines Prescribed:' : 'No medicines prescribed.'}
-${visitData.medicines && visitData.medicines.length > 0 ? visitData.medicines.map(med => `- ${med.name}: ${med.dosage}, ${med.frequency}`).join('\n') : ''}
-
-Financial Details:
-Total Amount: ₹${visitData.totalAmount}
-Amount Paid: ₹${visitData.amountPaid}
-Remaining Balance: ₹${(parseFloat(visitData.totalAmount) - parseFloat(visitData.amountPaid)).toFixed(2)}
-
-Additional Notes:
-${visitData.notes}
-
-${visitData.nextVisitDate && visitData.nextVisitTime ? `Next Visit: ${visitData.nextVisitDate} at ${visitData.nextVisitTime}` : 'No next visit scheduled.'}
-
-You can also log in to your account to track your treatment progress: ${data.loginLink}
-
-Best regards,
-${clinicName} Team
-        `,
+        text: generatePlainTextEmail(data),
       };
 
       // Create a Nodemailer transporter using SES
@@ -130,7 +103,10 @@ ${clinicName} Team
       });
       res.status(500).json({
         message: 'Error sending email',
-        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error',
+        error:
+          process.env.NODE_ENV === 'development'
+            ? error.message
+            : 'Internal Server Error',
       });
     }
   } else {
@@ -139,7 +115,77 @@ ${clinicName} Team
   }
 }
 
-// Helper function to format dates from 'dd-mm-yyyy' to 'dd-mm-yyyy' for display (no change)
+// Helper function to format dates (no changes needed)
 const formatDateForDisplay = (dateStr) => {
   return dateStr;
+};
+
+// Helper function to generate plain text email
+const generatePlainTextEmail = (data) => {
+  const {
+    patientName,
+    clinicName,
+    doctorName,
+    clinicAddress,
+    visitNumber,
+    visitData,
+    loginLink,
+  } = data;
+
+  let medicinesText = '';
+  if (visitData.medicines && visitData.medicines.length > 0) {
+    medicinesText += 'Medicines Prescribed:\n';
+    visitData.medicines.forEach((med, index) => {
+      const timings = [];
+      if (med.timings.morning) timings.push('Morning');
+      if (med.timings.afternoon) timings.push('Afternoon');
+      if (med.timings.night) timings.push('Night');
+      medicinesText += `- ${med.name} (${timings.join(', ')})\n`;
+    });
+  } else {
+    medicinesText += 'No medicines prescribed.\n';
+  }
+
+  const nextVisit =
+    visitData.nextVisitDate && visitData.nextVisitTime
+      ? `Next Visit: ${visitData.nextVisitDate} at ${visitData.nextVisitTime}\n`
+      : 'No next visit scheduled.\n';
+
+  return `
+Visit Details from ${clinicName}
+
+Dear ${patientName},
+
+Thank you for visiting ${clinicName}. Below are the details of your recent visit.
+
+Doctor: Dr. ${doctorName}
+Clinic: ${clinicName}
+Clinic Address: ${clinicAddress}
+Visit Number: ${visitNumber}
+Date: ${visitData.visitDate}
+Time: ${visitData.visitTime}
+Reason for Visit: ${visitData.visitReason}
+Symptoms Observed: ${visitData.symptoms}
+
+${medicinesText}
+
+Financial Details:
+Total Amount: ₹${visitData.totalAmount}
+Amount Paid: ₹${visitData.amountPaid}
+Remaining Balance: ₹${(
+    parseFloat(visitData.totalAmount) - parseFloat(visitData.amountPaid)
+  ).toFixed(2)}
+
+Additional Notes:
+${visitData.notes}
+
+${nextVisit}
+
+Stay positive and keep up the good work! Remember, consistent care and a positive mindset are key to your well-being. We're here to support you every step of the way.
+
+You can also log in to your account to track your treatment progress: ${loginLink}
+
+Best regards,
+${clinicName} Team
+`.trim();
 };
