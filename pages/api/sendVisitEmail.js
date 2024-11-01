@@ -3,9 +3,9 @@
 import AWS from 'aws-sdk';
 import ejs from 'ejs';
 import path from 'path';
-import fs from 'fs/promises'; // Use promise-based fs
+import fs from 'fs/promises';
 import nodemailer from 'nodemailer';
-import puppeteer from 'puppeteer';
+import chromium from 'chrome-aws-lambda';
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
 
     const ses = new AWS.SES({ apiVersion: '2010-12-01' });
 
-    // Generate PDF from EJS template using Puppeteer
+    // Generate PDF from EJS template
     const templatePath = path.join(
       process.cwd(),
       'templates',
@@ -71,10 +71,26 @@ export default async function handler(req, res) {
       // Render the HTML content
       const htmlContent = ejs.render(template, data);
 
-      // Generate PDF using Puppeteer
-      const browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      });
+      // Conditionally use Puppeteer based on environment
+      const isProd = process.env.NODE_ENV === 'production';
+      let browser;
+
+      if (isProd) {
+        // **Production Environment: Use chrome-aws-lambda with puppeteer-core**
+        browser = await chromium.puppeteer.launch({
+          args: chromium.args,
+          defaultViewport: chromium.defaultViewport,
+          executablePath: await chromium.executablePath,
+          headless: chromium.headless,
+        });
+      } else {
+        // **Development Environment: Use standard Puppeteer**
+        const puppeteer = require('puppeteer');
+        browser = await puppeteer.launch({
+          headless: true,
+        });
+      }
+
       const page = await browser.newPage();
       await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
       const pdfBuffer = await page.pdf({
@@ -95,6 +111,7 @@ export default async function handler(req, res) {
 <html>
 <head>
   <style>
+    /* Your existing styles */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #f0f8ff;
@@ -196,10 +213,14 @@ ${clinicName} Team
       console.log('Email sent successfully');
       res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
-      console.error('Error sending email:', error);
-      res
-        .status(500)
-        .json({ message: 'Error sending email', error: error.message });
+      console.error('Error sending email:', {
+        message: error.message,
+        stack: error.stack,
+      });
+      res.status(500).json({
+        message: 'Error sending email',
+        error: error.message,
+      });
     }
   } else {
     res.setHeader('Allow', 'POST');
@@ -207,7 +228,7 @@ ${clinicName} Team
   }
 }
 
-// Helper function to format dates from 'dd-mm-yyyy' to 'dd-mm-yyyy' for display (no change)
+// Helper function to format dates
 const formatDateForDisplay = (dateStr) => {
   return dateStr;
 };
