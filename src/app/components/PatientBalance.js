@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,7 +5,7 @@ import { db } from '../../db';
 import { collection, getDocs } from 'firebase/firestore';
 import { useSession } from 'next-auth/react';
 import { decryptData } from '../../lib/encryption';
-import { FiDollarSign } from 'react-icons/fi';
+import { FaRupeeSign } from 'react-icons/fa'; // Rupee Icon
 import { BsSearch } from 'react-icons/bs';
 import { motion } from 'framer-motion';
 
@@ -19,41 +18,70 @@ const PatientBalance = () => {
     if (!session || !session.user || !session.user.id) return;
 
     const fetchBalances = async () => {
-      const doctorId = session.user.id;
-      const patientsRef = collection(db, 'doctors', doctorId, 'patients');
-      const patientsSnapshot = await getDocs(patientsRef);
+      try {
+        const doctorId = session.user.id;
+        const patientsRef = collection(db, 'doctors', doctorId, 'patients');
+        const patientsSnapshot = await getDocs(patientsRef);
 
-      const balancesData = [];
+        const balancesData = [];
 
-      for (const patientDoc of patientsSnapshot.docs) {
-        const patientId = patientDoc.id;
-        const patientData = patientDoc.data();
-        const patientName = decryptData(patientData.name);
+        for (const patientDoc of patientsSnapshot.docs) {
+          const patientId = patientDoc.id;
+          const patientData = patientDoc.data();
+          const patientName = decryptData(patientData.name);
 
-        let totalAmount = 0;
-        let amountPaid = 0;
+          let totalAmount = 0;
+          let amountPaid = 0;
+          const outstandingVisits = []; // To store visits with remaining balance
 
-        const visitsRef = collection(db, 'doctors', doctorId, 'patients', patientId, 'visits');
-        const visitsSnapshot = await getDocs(visitsRef);
+          const visitsRef = collection(db, 'doctors', doctorId, 'patients', patientId, 'visits');
+          const visitsSnapshot = await getDocs(visitsRef);
 
-        visitsSnapshot.forEach((visitDoc) => {
-          const visitData = visitDoc.data();
-          totalAmount += parseFloat(visitData.totalAmount || '0');
-          amountPaid += parseFloat(visitData.amountPaid || '0');
-        });
+          visitsSnapshot.forEach((visitDoc) => {
+            const visitData = visitDoc.data();
 
-        const balance = totalAmount - amountPaid;
+            const visitTotal = parseFloat(visitData.totalAmount || '0');
+            const visitPaid = parseFloat(visitData.amountPaid || '0');
+            const balance = visitTotal - visitPaid;
 
-        if (balance > 0) {
-          balancesData.push({
-            patientId,
-            patientName,
-            balance: balance.toFixed(2),
+            totalAmount += visitTotal;
+            amountPaid += visitPaid;
+
+            if (balance > 0) {
+              // Decrypt visit fields as necessary
+              outstandingVisits.push({
+                visitId: visitDoc.id,
+                visitDate: decryptData(visitData.visitDate),
+                visitTime: decryptData(visitData.visitTime),
+                visitReason: decryptData(visitData.visitReason),
+                symptoms: decryptData(visitData.symptoms),
+                treatmentStatus: decryptData(visitData.treatmentStatus),
+                nextVisitDate: decryptData(visitData.nextVisitDate),
+                nextVisitTime: decryptData(visitData.nextVisitTime),
+                totalAmount: visitData.totalAmount,
+                amountPaid: visitData.amountPaid,
+                notes: decryptData(visitData.notes),
+                balance: balance.toFixed(2),
+              });
+            }
           });
-        }
-      }
 
-      setBalances(balancesData);
+          const balanceRemaining = totalAmount - amountPaid;
+
+          if (balanceRemaining > 0) {
+            balancesData.push({
+              patientId,
+              patientName,
+              balance: balanceRemaining.toFixed(2),
+              outstandingVisits, // Include outstanding visits
+            });
+          }
+        }
+
+        setBalances(balancesData);
+      } catch (error) {
+        console.error('Error fetching balances:', error);
+      }
     };
 
     fetchBalances();
@@ -72,7 +100,7 @@ const PatientBalance = () => {
   return (
     <div className="p-6">
       <div className="flex items-center mb-6">
-        <FiDollarSign className="text-3xl text-yellow-500 mr-2" />
+        <FaRupeeSign className="text-3xl text-yellow-500 mr-2" /> {/* Rupee Icon */}
         <h2 className="text-2xl font-bold">Patients with Outstanding Balance</h2>
       </div>
 
@@ -98,9 +126,40 @@ const PatientBalance = () => {
               whileHover={{ scale: 1.02 }}
             >
               <h3 className="text-xl font-semibold mb-2">{balance.patientName}</h3>
-              <p>
+              <p className="flex items-center">
+                <FaRupeeSign className="text-lg text-yellow-500 mr-1" /> {/* Rupee Icon */}
                 <strong>Outstanding Balance:</strong> ₹{balance.balance}
               </p>
+              <div className="mt-4">
+                <h4 className="text-lg font-medium mb-2">Outstanding Visits:</h4>
+                {balance.outstandingVisits.map((visit) => (
+                  <div key={visit.visitId} className="mb-2 p-3 bg-white rounded shadow-sm">
+                    {/* <p>
+                      <strong>Visit ID:</strong> {visit.visitId}
+                    </p> */}
+                    <p>
+                      <strong>Date:</strong> {visit.visitDate} at {visit.visitTime}
+                    </p>
+                    <p>
+                      <strong>Reason:</strong> {visit.visitReason}
+                    </p>
+                    <p>
+                      <strong>Symptoms:</strong> {visit.symptoms}
+                    </p>
+                    <p>
+                      <strong>Treatment Status:</strong> {visit.treatmentStatus}
+                    </p>
+                    {visit.nextVisitDate && visit.nextVisitTime && (
+                      <p>
+                        <strong>Next Visit:</strong> {visit.nextVisitDate} at {visit.nextVisitTime}
+                      </p>
+                    )}
+                    <p>
+                      <strong>Remaining Balance:</strong> ₹{visit.balance}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </motion.div>
           ))}
         </div>
