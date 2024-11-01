@@ -15,6 +15,8 @@
       padding: 20px;
       border-radius: 10px;
       border: 1px solid #dddddd;
+      max-width: 600px;
+      margin: auto;
     }
     .header {
       background-color: #1e90ff;
@@ -37,25 +39,36 @@
       border-bottom-left-radius: 10px;
       border-bottom-right-radius: 10px;
     }
-    .section {
-      margin-bottom: 20px;
+    .button {
+      background-color: #32cd32;
+      color: #ffffff;
+      padding: 12px 25px;
+      text-decoration: none;
+      display: inline-block;
+      margin-top: 20px;
+      border-radius: 5px;
+      font-weight: bold;
     }
-    .section h2 {
-      border-bottom: 1px solid #dddddd;
-      padding-bottom: 5px;
-      color: #1e90ff;
-    }
-    .medicine-table {
+    table {
       width: 100%;
       border-collapse: collapse;
+      margin-top: 20px;
     }
-    .medicine-table th, .medicine-table td {
+    th, td {
       border: 1px solid #dddddd;
       padding: 8px;
       text-align: left;
     }
-    .medicine-table th {
+    th {
       background-color: #f2f2f2;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .section h2 {
+      color: #1e90ff;
+      border-bottom: 2px solid #dddddd;
+      padding-bottom: 5px;
     }
   </style>
 </head>
@@ -65,11 +78,12 @@
       <h1>ClinicEase</h1>
     </div>
     <div class="content">
+      <p>Dear <strong><%= patientName %></strong>,</p>
+      <p>Thank you for visiting <strong><%= clinicName %></strong>. Below are the details of your recent visit:</p>
+
       <div class="section">
-        <h2>Visit Details</h2>
-        <p><strong>Patient Name:</strong> <%= patientName %></p>
+        <h2>Visit Information</h2>
         <p><strong>Doctor:</strong> Dr. <%= doctorName %></p>
-        <p><strong>Clinic:</strong> <%= clinicName %></p>
         <p><strong>Clinic Address:</strong> <%= clinicAddress %></p>
         <p><strong>Visit Number:</strong> <%= visitNumber %></p>
         <p><strong>Date:</strong> <%= visitData.visitDate %></p>
@@ -77,56 +91,61 @@
         <p><strong>Reason for Visit:</strong> <%= visitData.visitReason %></p>
         <p><strong>Symptoms Observed:</strong> <%= visitData.symptoms %></p>
       </div>
-      
+
       <div class="section">
         <h2>Medicines Prescribed</h2>
-        <table class="medicine-table">
-          <thead>
-            <tr>
-              <th>Medicine Name</th>
-              <th>Timings</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% visitData.medicines.forEach(function(med) { %>
+        <% if (visitData.medicines && visitData.medicines.length > 0) { %>
+          <table>
+            <thead>
               <tr>
-                <td><%= med.name %></td>
-                <td>
-                  <% 
-                    let timings = [];
-                    if(med.timings.morning) timings.push('Morning');
-                    if(med.timings.afternoon) timings.push('Afternoon');
-                    if(med.timings.night) timings.push('Night');
-                  %>
-                  <%= timings.join(', ') %>
-                </td>
+                <th>Medicine Name</th>
+                <th>Dosage</th>
+                <th>Frequency</th>
               </tr>
-            <% }); %>
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              <% visitData.medicines.forEach(function(med) { %>
+                <tr>
+                  <td><%= med.name %></td>
+                  <td><%= med.dosage %></td>
+                  <td><%= med.frequency %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        <% } else { %>
+          <p>No medicines prescribed.</p>
+        <% } %>
       </div>
-      
+
       <div class="section">
         <h2>Financial Details</h2>
         <p><strong>Total Amount:</strong> ₹<%= visitData.totalAmount %></p>
         <p><strong>Amount Paid:</strong> ₹<%= visitData.amountPaid %></p>
         <p><strong>Remaining Balance:</strong> ₹<%= (parseFloat(visitData.totalAmount) - parseFloat(visitData.amountPaid)).toFixed(2) %></p>
       </div>
-      
+
       <div class="section">
         <h2>Additional Notes</h2>
         <p><%= visitData.notes %></p>
       </div>
-      
+
       <div class="section">
         <h2>Next Visit</h2>
-        <% if(visitData.nextVisitDate && visitData.nextVisitTime) { %>
+        <% if (visitData.nextVisitDate && visitData.nextVisitTime) { %>
           <p><strong>Date:</strong> <%= visitData.nextVisitDate %></p>
           <p><strong>Time:</strong> <%= visitData.nextVisitTime %></p>
         <% } else { %>
           <p>No next visit scheduled.</p>
         <% } %>
       </div>
+
+      <p>You can also log in to your account to track your treatment progress.</p>
+      <p>
+        <a href="<%= loginLink %>" class="button">Login to Your Account</a>
+      </p>
+      <p>If you have any questions or need further assistance, feel free to reach out to us.</p>
+      <p>Best regards,<br/><strong><%= clinicName %></strong> Team</p>
     </div>
     <div class="footer">
       <p>&copy; <%= new Date().getFullYear() %> ClinicEase. All rights reserved.</p>

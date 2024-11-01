@@ -6,18 +6,6 @@ import path from 'path';
 import fs from 'fs/promises';
 import nodemailer from 'nodemailer';
 
-// Conditional imports based on environment
-let chromium;
-let puppeteer;
-if (process.env.NODE_ENV === 'production') {
-  // Production: Use chrome-aws-lambda and puppeteer-core
-  chromium = require('chrome-aws-lambda');
-  puppeteer = require('puppeteer-core');
-} else {
-  // Development: Use full puppeteer
-  puppeteer = require('puppeteer');
-}
-
 export default async function handler(req, res) {
   if (req.method === 'POST') {
     const {
@@ -52,11 +40,11 @@ export default async function handler(req, res) {
 
     const ses = new AWS.SES({ apiVersion: '2010-12-01' });
 
-    // Generate PDF from EJS template
+    // Generate Email Content from EJS Template
     const templatePath = path.join(
       process.cwd(),
       'templates',
-      'visitDetailsTemplate.ejs'
+      'visitDetailsEmailTemplate.ejs'
     );
 
     try {
@@ -77,136 +65,52 @@ export default async function handler(req, res) {
             ? formatDateForDisplay(visitData.nextVisitDate)
             : '',
         },
+        loginLink: 'https://clinic-ease.netlify.app/patient-login',
       };
 
       // Render the HTML content
       const htmlContent = ejs.render(template, data);
-
-      // Launch Puppeteer
-      let browser;
-      if (process.env.NODE_ENV === 'production') {
-        // Production: Use chrome-aws-lambda's executable path and args
-        browser = await puppeteer.launch({
-          args: chromium.args,
-          defaultViewport: chromium.defaultViewport,
-          executablePath: await chromium.executablePath,
-          headless: chromium.headless,
-        });
-      } else {
-        // Development: Launch normally
-        browser = await puppeteer.launch({
-          headless: true,
-        });
-      }
-
-      const page = await browser.newPage();
-      await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-      });
-      await browser.close();
-
-      const loginLink = 'https://clinic-ease.netlify.app/patient-login';
 
       // Construct the email parameters
       const mailOptions = {
         from: process.env.SES_FROM_EMAIL,
         to: toEmail,
         subject: `Your Visit Details - ${clinicName}`,
-        html: `
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #f0f8ff;
-      margin: 0;
-      padding: 20px;
-    }
-    .container {
-      background-color: #ffffff;
-      padding: 20px;
-      border-radius: 10px;
-      border: 1px solid #dddddd;
-    }
-    .header {
-      background-color: #1e90ff;
-      color: #ffffff;
-      padding: 15px;
-      text-align: center;
-      border-top-left-radius: 10px;
-      border-top-right-radius: 10px;
-    }
-    .content {
-      padding: 20px;
-      color: #333333;
-    }
-    .footer {
-      background-color: #f8f8f8;
-      color: #777777;
-      padding: 10px;
-      text-align: center;
-      font-size: 12px;
-      border-bottom-left-radius: 10px;
-      border-bottom-right-radius: 10px;
-    }
-    .button {
-      background-color: #32cd32;
-      color: #ffffff;
-      padding: 12px 25px;
-      text-decoration: none;
-      display: inline-block;
-      margin-top: 20px;
-      border-radius: 5px;
-      font-weight: bold;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>ClinicEase</h1>
-    </div>
-    <div class="content">
-      <p>Dear ${patientName},</p>
-      <p>Thank you for visiting <strong>${clinicName}</strong>. Please find attached the details of your visit.</p>
-      <p>You can also log in to your account to track your treatment progress.</p>
-      <p>
-        <a href="${loginLink}" class="button">Login to Your Account</a>
-      </p>
-      <p>If you have any questions or need further assistance, feel free to reach out to us.</p>
-      <p>Best regards,<br/>${clinicName} Team</p>
-    </div>
-    <div class="footer">
-      <p>&copy; ${new Date().getFullYear()} ClinicEase. All rights reserved.</p>
-    </div>
-  </div>
-</body>
-</html>
-        `,
+        html: htmlContent,
         text: `
 Visit Details from ${clinicName}
 
 Dear ${patientName},
 
-Thank you for visiting ${clinicName}. Attached is the detailed report of your visit.
+Thank you for visiting ${clinicName}. Below are the details of your recent visit.
 
-You can also log in to your account to track your treatment progress.
+Doctor: Dr. ${doctorName}
+Clinic: ${clinicName}
+Clinic Address: ${clinicAddress}
+Visit Number: ${visitNumber}
+Date: ${visitData.visitDate}
+Time: ${visitData.visitTime}
+Reason for Visit: ${visitData.visitReason}
+Symptoms Observed: ${visitData.symptoms}
 
-Login to Your Account: ${loginLink}
+${visitData.medicines && visitData.medicines.length > 0 ? 'Medicines Prescribed:' : 'No medicines prescribed.'}
+${visitData.medicines && visitData.medicines.length > 0 ? visitData.medicines.map(med => `- ${med.name}: ${med.dosage}, ${med.frequency}`).join('\n') : ''}
+
+Financial Details:
+Total Amount: ₹${visitData.totalAmount}
+Amount Paid: ₹${visitData.amountPaid}
+Remaining Balance: ₹${(parseFloat(visitData.totalAmount) - parseFloat(visitData.amountPaid)).toFixed(2)}
+
+Additional Notes:
+${visitData.notes}
+
+${visitData.nextVisitDate && visitData.nextVisitTime ? `Next Visit: ${visitData.nextVisitDate} at ${visitData.nextVisitTime}` : 'No next visit scheduled.'}
+
+You can also log in to your account to track your treatment progress: ${data.loginLink}
 
 Best regards,
 ${clinicName} Team
         `,
-        attachments: [
-          {
-            filename: 'VisitDetails.pdf',
-            content: pdfBuffer,
-            contentType: 'application/pdf',
-          },
-        ],
       };
 
       // Create a Nodemailer transporter using SES
@@ -235,7 +139,7 @@ ${clinicName} Team
   }
 }
 
-// Helper function to format dates
+// Helper function to format dates from 'dd-mm-yyyy' to 'dd-mm-yyyy' for display (no change)
 const formatDateForDisplay = (dateStr) => {
   return dateStr;
 };
