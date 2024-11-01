@@ -5,7 +5,18 @@ import ejs from 'ejs';
 import path from 'path';
 import fs from 'fs/promises';
 import nodemailer from 'nodemailer';
-import chromium from 'chrome-aws-lambda';
+
+// Conditional imports based on environment
+let chromium;
+let puppeteer;
+if (process.env.NODE_ENV === 'production') {
+  // Production: Use chrome-aws-lambda and puppeteer-core
+  chromium = require('chrome-aws-lambda');
+  puppeteer = require('puppeteer-core');
+} else {
+  // Development: Use full puppeteer
+  puppeteer = require('puppeteer');
+}
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
@@ -71,21 +82,18 @@ export default async function handler(req, res) {
       // Render the HTML content
       const htmlContent = ejs.render(template, data);
 
-      // Conditionally use Puppeteer based on environment
-      const isProd = process.env.NODE_ENV === 'production';
+      // Launch Puppeteer
       let browser;
-
-      if (isProd) {
-        // **Production Environment: Use chrome-aws-lambda with puppeteer-core**
-        browser = await chromium.puppeteer.launch({
+      if (process.env.NODE_ENV === 'production') {
+        // Production: Use chrome-aws-lambda's executable path and args
+        browser = await puppeteer.launch({
           args: chromium.args,
           defaultViewport: chromium.defaultViewport,
           executablePath: await chromium.executablePath,
           headless: chromium.headless,
         });
       } else {
-        // **Development Environment: Use standard Puppeteer**
-        const puppeteer = require('puppeteer');
+        // Development: Launch normally
         browser = await puppeteer.launch({
           headless: true,
         });
@@ -111,7 +119,6 @@ export default async function handler(req, res) {
 <html>
 <head>
   <style>
-    /* Your existing styles */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #f0f8ff;
@@ -219,7 +226,7 @@ ${clinicName} Team
       });
       res.status(500).json({
         message: 'Error sending email',
-        error: error.message,
+        error: process.env.NODE_ENV === 'development' ? error.message : 'Internal Server Error',
       });
     }
   } else {
