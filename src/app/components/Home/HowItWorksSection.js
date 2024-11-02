@@ -60,7 +60,7 @@ const HowItWorksSection = () => {
         </motion.h2>
         <div className="relative">
           {/* Vertical Timeline Line */}
-          <div className="absolute left-1/2 transform -translate-x-1/2 h-full border-l-2 border-teal-300 z-0"></div>
+          <div className="absolute left-1/2 transform -translate-x-1/2 top-0 bottom-0 border-l-2 border-teal-300 z-0"></div>
 
           <div className="space-y-12">
             {steps.map((step, index) => (
@@ -92,7 +92,7 @@ const HowItWorksSection = () => {
                 </div>
 
                 {/* Content */}
-                <div className="w-full md:w-1/2 mt-4 md:mt-0">
+                <div className="w-full md:w-1/2 mt-4 md:mt-0 relative z-10">
                   <div className="bg-white p-6 rounded-lg shadow-md">
                     <h3 className="text-2xl font-semibold text-teal-700 mb-2">
                       {step.title}
