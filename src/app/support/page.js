@@ -131,7 +131,7 @@ const SupportPage = () => {
               <li className="flex items-start">
                 <span className="mr-3 text-blue-500"><FaUser /></span>
                 <div>
-                  <strong>Access the App:</strong> Once verified, you'll be able to use the Clinoic Ease app without any restrictions.
+                  <strong>Access the App:</strong> Once verified, you'll be able to use that Email for signup to the ClinicEase app without any restrictions.
                 </div>
               </li>
             </ol>
