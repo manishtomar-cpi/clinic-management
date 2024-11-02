@@ -1,60 +1,153 @@
-// src/pages/api/users/update-profile.js
+// pages/api/users/update-profile.js
 
 import { db } from '../../../src/db';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { getServerSession } from 'next-auth/next';
+import {
+  collection,
+  doc,
+  updateDoc,
+  query,
+  where,
+  getDocs,
+} from 'firebase/firestore';
+import { encryptData } from '../../../src/lib/encryption';
 import bcrypt from 'bcryptjs';
+import { authOptions } from '../auth/[...nextauth]';
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
-    const { userId, username, password } = req.body;
-    console.log("Request Body:", req.body);
+    // Retrieve session to identify the authenticated user
+    const session = await getServerSession(req, res, authOptions);
 
+    console.log('Session in API Route:', session);
 
-    // Validate input
+    if (!session) {
+      // If not authenticated, return 401 Unauthorized
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const userId = session.user.id;
+
+    // Check if userId is undefined
     if (!userId) {
-      return res.status(400).json({ message: 'User ID is required.' });
+      console.error('User ID is undefined in session');
+      return res.status(500).json({ message: 'User ID not found in session' });
     }
-    if (!username || typeof username !== 'string' || username.length < 6) {
-      return res.status(400).json({ message: 'Invalid username.' });
-    }
+
+    const {
+      username,
+      doctorName,
+      clinicName,
+      email,
+      password,
+      clinicLocation,
+    } = req.body;
 
     try {
-      // Check if the new username is already taken
-      const usersRef = collection(db, 'users');
-      const usernameQuery = query(usersRef, where('username', '==', username));
-      const usernameSnapshot = await getDocs(usernameQuery);
+      // Validate that at least one field is provided
+      if (
+        !username &&
+        !doctorName &&
+        !clinicName &&
+        !email &&
+        !password &&
+        !clinicLocation
+      ) {
+        return res.status(400).json({ message: 'No data provided to update' });
+      }
 
-      if (!usernameSnapshot.empty) {
-        const existingUser = usernameSnapshot.docs[0];
-        if (existingUser.id !== userId) {
-          return res.status(409).json({ message: 'Username is already taken.' });
+      // Prepare an object to hold the updates
+      const updates = {};
+
+      // If username is being updated
+      if (username) {
+        // Validate username format
+        const usernamePattern = /^[a-zA-Z0-9._]{6,}$/;
+        if (!usernamePattern.test(username)) {
+          return res.status(400).json({
+            message:
+              'Username must be at least 6 characters and can include letters, digits, underscores, and periods.',
+          });
         }
+
+        // Check if the username already exists (excluding current user)
+        const usersRef = collection(db, 'users');
+        const qUsername = query(usersRef, where('username', '==', username));
+        const querySnapshotUsername = await getDocs(qUsername);
+
+        let usernameTaken = false;
+        querySnapshotUsername.forEach((doc) => {
+          if (doc.id !== userId) {
+            usernameTaken = true;
+          }
+        });
+
+        if (usernameTaken) {
+          return res.status(409).json({ message: 'Username is already taken' });
+        }
+
+        updates.username = username;
       }
 
-      const userRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userRef);
+      // If email is being updated
+      if (email) {
+        // Validate email format
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(email)) {
+          return res.status(400).json({
+            message: 'Please enter a valid email address.',
+          });
+        }
 
-      if (!userDoc.exists()) {
-        return res.status(404).json({ message: 'User not found.' });
+        // Assuming email verification is handled on the frontend
+        updates.email = email;
       }
 
-      const updateData = { username };
+      // If password is being updated
+      if (password) {
+        // Validate password format
+        const passwordPattern = /^(?=.*[A-Z])(?=.*[!@#$%^&*])(?=.{8,})/;
+        if (!passwordPattern.test(password)) {
+          return res.status(400).json({
+            message:
+              'Password must be at least 8 characters, include one uppercase letter, and one special character.',
+          });
+        }
 
-      // Hash the new password if provided
-      if (password && password.length >= 8) {
+        // Hash the new password before storing it
         const hashedPassword = await bcrypt.hash(password, 10);
-        updateData.password = hashedPassword;
+        updates.password = hashedPassword;
       }
 
-      // Update the user document in Firestore
-      await updateDoc(userRef, updateData);
+      // Update other fields if provided
+      if (doctorName) {
+        updates.doctorName = encryptData(doctorName);
+      }
 
-      res.status(200).json({ message: 'Profile updated successfully.' });
+      if (clinicName) {
+        updates.clinicName = encryptData(clinicName);
+      }
+
+      if (clinicLocation) {
+        updates.clinicLocation = encryptData(clinicLocation);
+      }
+
+      // Ensure there is at least one field to update
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: 'No valid fields to update' });
+      }
+
+      // Update the user's document in Firestore
+      const userDocRef = doc(db, 'users', userId);
+      await updateDoc(userDocRef, updates);
+
+      res.status(200).json({ message: 'Profile updated successfully' });
     } catch (error) {
       console.error('Error updating profile:', error);
-      res.status(500).json({ message: 'Error updating profile.' });
+      res.status(500).json({ message: 'Error updating profile' });
     }
   } else {
+    // If the request method is not POST
     res.setHeader('Allow', 'POST');
     res.status(405).json({ message: 'Method not allowed' });
   }

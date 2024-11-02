@@ -1,3 +1,4 @@
+// pages/api/auth/[...nextauth].js
 
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
@@ -5,7 +6,7 @@ import { db } from '../../../src/db';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import bcrypt from 'bcryptjs';
 
-export default NextAuth({
+export const authOptions = {
   providers: [
     CredentialsProvider({
       name: 'Credentials',
@@ -39,9 +40,6 @@ export default NextAuth({
             throw new Error('Invalid credentials');
           }
 
-          // Do NOT decrypt the encrypted user data here
-          // Pass the encrypted data through to the token and session
-
           // Return the user object with encrypted data
           return {
             id: userDoc.id,
@@ -61,6 +59,7 @@ export default NextAuth({
   },
   session: {
     strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // Optional: Set session max age
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -68,23 +67,23 @@ export default NextAuth({
       if (user) {
         token.id = user.id;
         token.username = user.username;
-        token.doctorName = user.doctorName; // Encrypted
-        token.clinicName = user.clinicName; // Encrypted
+        token.doctorName = user.doctorName;
+        token.clinicName = user.clinicName;
       }
       return token;
     },
     async session({ session, token }) {
-      // Add custom properties from the token to the session object
+      // Ensure custom properties are directly assigned to session.user
       if (token) {
-        session.user = {
-          id: token.id,
-          username: token.username,
-          doctorName: token.doctorName, // Encrypted
-          clinicName: token.clinicName, // Encrypted
-        };
+        session.user.id = token.id;
+        session.user.username = token.username;
+        session.user.doctorName = token.doctorName;
+        session.user.clinicName = token.clinicName;
       }
       return session;
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
-});
+};
+
+export default NextAuth(authOptions);
