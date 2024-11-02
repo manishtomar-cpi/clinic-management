@@ -767,13 +767,13 @@ const UpdateProfile = () => {
           </button>
 
           {/* Links for Back to Dashboard */}
-          <div className="mt-6 text-center">
+          {/* <div className="mt-6 text-center">
             <p className="text-gray-600">
               <Link href="/dashboard" className="text-blue-600 hover:underline">
                 Back to Dashboard
               </Link>
             </p>
-          </div>
+          </div> */}
         </form>
       </div>
     </div>

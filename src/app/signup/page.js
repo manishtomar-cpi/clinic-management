@@ -506,84 +506,107 @@ const Signup = () => {
             </div>
           </div>
 
-          {/* Email */}
-          <div className="mb-4 relative">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
-              Email Address
-            </label>
-            <div className="flex items-center bg-gray-100 p-2 rounded">
-              <FaEnvelope className="text-purple-500 mr-2" />
-              <input
-                type="email"
-                name="email"
-                id="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                placeholder="Enter your email"
-                required
-                className="bg-gray-100 focus:outline-none w-full"
-              />
-              {!otpSent && (
-                <button
-                  type="button"
-                  onClick={handleSendOtp}
-                  className="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
-                >
-                  Verify
-                </button>
-              )}
-              {otpSent && emailVerified && (
-                <FaCheckCircle className="text-green-500 ml-2" title="Email Verified" />
-              )}
-            </div>
-            {otpError && (
-              <p className="text-red-500 text-xs mt-1">{otpError}</p>
-            )}
-            {otpSent && !emailVerified && (
-              <div className="mt-2">
-                <label className="block text-gray-700 text-sm font-bold mb-1" htmlFor="otp">
-                  Enter OTP
-                </label>
-                <div className="flex flex-col items-center">
-                  <CustomOtpInput
-                    length={6} // 6-digit OTP
-                    value={otp}
-                    onChange={setOtpValue}
-                    error={otpError}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleVerifyOtp}
-                    className="mt-3 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center"
-                    disabled={verifyingOtp}
-                  >
-                    {verifyingOtp ? (
-                      <FaSpinner className="animate-spin mr-2" />
-                    ) : (
-                      <FaCheck />
-                    )}
-                    Verify
-                  </button>
-                </div>
-                {/* Countdown Timer */}
-                {otpSent && !emailVerified && timer > 0 && (
-                  <p className="text-gray-600 text-xs mt-1">
-                    OTP expires in: {Math.floor(timer / 60)}:{('0' + (timer % 60)).slice(-2)}
-                  </p>
-                )}
-                {/* Expiry Message */}
-                {otpSent && !emailVerified && timer === 0 && (
-                  <p className="text-red-500 text-xs mt-1">OTP has expired. Please request a new one.</p>
-                )}
-                {emailVerified && (
-                  <p className="text-green-500 text-xs mt-1">Email verified!</p>
-                )}
-                {otpError && (
-                  <p className="text-red-500 text-xs mt-1">{otpError}</p>
-                )}
-              </div>
-            )}
-          </div>
+         {/* Email Verification Section */}
+<div className="mb-4 relative">
+  {/* Always-Visible Blinking Message */}
+  <div
+    className="p-4 mb-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded relative animate-pulse"
+  >
+    <p className="text-sm">
+      <strong>Verification Required:</strong> A verified email is required for signup. If your email isn't verified via AWS, please{' '}
+      <button
+        onClick={() => window.location.href = '/support'}
+        className="text-blue-500 underline focus:outline-none"
+      >
+        contact support
+      </button>{' '}
+      to get your email verified. Once your email is verified, you can proceed to use the ClinicEase app.
+    </p>
+  </div>
+
+  {/* Email Input Field */}
+  <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
+    Email Address
+  </label>
+  <div className="flex items-center bg-gray-100 p-2 rounded">
+    <FaEnvelope className="text-purple-500 mr-2" />
+    <input
+      type="email"
+      name="email"
+      id="email"
+      value={formData.email}
+      onChange={handleInputChange}
+      placeholder="Enter your email"
+      required
+      className="bg-gray-100 focus:outline-none w-full"
+    />
+    {!otpSent && (
+      <button
+        type="button"
+        onClick={handleSendOtp}
+        className="ml-2 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+      >
+        Verify
+      </button>
+    )}
+    {otpSent && emailVerified && (
+      <FaCheckCircle className="text-green-500 ml-2" title="Email Verified" />
+    )}
+  </div>
+
+  {/* Display OTP error if any */}
+  {otpError && (
+    <p className="text-red-500 text-xs mt-1">{otpError}</p>
+  )}
+
+  {/* OTP Input Section */}
+  {otpSent && !emailVerified && (
+    <div className="mt-2">
+      <label className="block text-gray-700 text-sm font-bold mb-1" htmlFor="otp">
+        Enter OTP
+      </label>
+      <div className="flex flex-col items-center">
+        <CustomOtpInput
+          length={6} // 6-digit OTP
+          value={otp}
+          onChange={setOtpValue}
+          error={otpError}
+        />
+        <button
+          type="button"
+          onClick={handleVerifyOtp}
+          className="mt-3 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center"
+          disabled={verifyingOtp}
+        >
+          {verifyingOtp ? (
+            <FaSpinner className="animate-spin mr-2" />
+          ) : (
+            <FaCheck />
+          )}
+          Verify
+        </button>
+      </div>
+      {/* Countdown Timer */}
+      {timer > 0 && (
+        <p className="text-gray-600 text-xs mt-1">
+          OTP expires in: {Math.floor(timer / 60)}:{('0' + (timer % 60)).slice(-2)}
+        </p>
+      )}
+      {/* Expiry Message */}
+      {timer === 0 && (
+        <p className="text-red-500 text-xs mt-1">OTP has expired. Please request a new one.</p>
+      )}
+      {emailVerified && (
+        <p className="text-green-500 text-xs mt-1">Email verified!</p>
+      )}
+      {/* General OTP Error */}
+      {otpError && otpError !== 'Email not verified. Please verify your email through support.' && (
+        <p className="text-red-500 text-xs mt-1">{otpError}</p>
+      )}
+    </div>
+  )}
+</div>
+
 
           {/* Password */}
           <div className="mb-4 relative">
