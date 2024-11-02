@@ -414,7 +414,16 @@ const UpdateProfile = () => {
       const response = await axios.post('/api/users/update-profile', updatedFields);
 
       if (response.status === 200) {
+        // Show success toast for profile update
         toast.success('Profile updated successfully!');
+
+        // Check if email was sent successfully
+        if (response.data.emailSent) {
+          toast.success('Notification email sent successfully!');
+        } else {
+          toast.error('Failed to send notification email.');
+        }
+
         // Update original values to new values
         if (updatedFields.username) setOriginalUsername(updatedFields.username);
         if (updatedFields.doctorName) setOriginalDoctorName(updatedFields.doctorName);
@@ -637,7 +646,7 @@ const UpdateProfile = () => {
                     disabled={verifyingOtp}
                   >
                     {verifyingOtp ? (
-                      <FaSpinner className="animate-spin mr-2" />
+                      <FaSpinner className="animate-spin text-xl mr-2" />
                     ) : (
                       <FaCheck />
                     )}

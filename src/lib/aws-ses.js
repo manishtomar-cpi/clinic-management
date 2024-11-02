@@ -36,10 +36,11 @@ export const sendEmail = async (to, subject, htmlBody) => {
   };
 
   try {
-    await ses.sendEmail(params).promise();
+    const result = await ses.sendEmail(params).promise();
     console.log(`Email sent to ${to} with subject "${subject}"`);
+    console.log('AWS SES Response:', result);
   } catch (error) {
     console.error(`Error sending email to ${to}:`, error);
-    throw new Error('Failed to send email notification.');
+    throw error; // Throw the actual error to be caught in the API route
   }
 };
