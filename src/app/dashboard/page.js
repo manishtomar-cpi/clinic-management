@@ -49,6 +49,7 @@ const DashboardContent = () => {
   const [allVisits, setAllVisits] = useState([]); // Centralized state for all visits
   const visitsListenersRef = useRef([]); // To store visits listeners
   const [totalPatients, setTotalPatients] = useState(0); // Track total patients
+  const [ongoingTreatments, setOngoingTreatments] = useState(0); // Track ongoing treatments
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -81,6 +82,13 @@ const DashboardContent = () => {
       (patientsSnapshot) => {
         const patientIds = patientsSnapshot.docs.map((doc) => doc.id);
         setTotalPatients(patientIds.length); // Set total patients count
+
+        // Calculate ongoing treatments
+        const ongoing = patientsSnapshot.docs.filter((doc) => {
+          const treatmentStatus = decryptData(doc.data().treatmentStatus || '');
+          return treatmentStatus === 'Ongoing';
+        }).length;
+        setOngoingTreatments(ongoing);
 
         // Clean up existing visits listeners
         visitsListenersRef.current.forEach((unsub) => unsub());
@@ -138,7 +146,6 @@ const DashboardContent = () => {
 
   useEffect(() => {
     // Compute counts based on allVisits
-    let ongoingTreatments = 0;
     let outstandingBalance = 0;
     let appointmentsToday = 0;
     let missedAppointmentsToday = 0;
@@ -172,9 +179,10 @@ const DashboardContent = () => {
         return; // Skip this visit if decryption fails
       }
 
-      if (treatmentStatus === 'Ongoing') {
-        ongoingTreatments += 1;
-      }
+      // Remove treatmentStatus counting from visits
+      // if (treatmentStatus === 'Ongoing') {
+      //   ongoingTreatments += 1;
+      // }
 
       outstandingBalance += totalAmount - amountPaid;
 
@@ -210,7 +218,7 @@ const DashboardContent = () => {
       },
       {
         title: 'Ongoing Treatments',
-        count: ongoingTreatments,
+        count: ongoingTreatments, // Use the updated state
         icon: <FiClipboard className="text-green-500" />,
         color: 'border-green-500',
         description: 'Patients currently under treatment',
@@ -241,7 +249,7 @@ const DashboardContent = () => {
         component: 'PatientBalance',
       },
     ]);
-  }, [allVisits, totalPatients]);
+  }, [allVisits, totalPatients, ongoingTreatments]);
 
   if (status === 'loading') {
     return <MedicalSpinner />;
@@ -312,7 +320,7 @@ const DashboardContent = () => {
                   icon={tile.icon}
                   color={tile.color}
                   description={tile.description}
-                  onClick={() => handleTileClick(tile.component)}
+                  onClick={() => handleMenuItemClick(tile.component)} // Updated here
                 />
               ))}
             </div>

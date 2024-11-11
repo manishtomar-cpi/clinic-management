@@ -17,8 +17,8 @@ import MedicalSpinner from './MedicalSpinner'; // Ensure this component exists
  * - requiredRole: (Optional) The role required to access the children.
  *
  * Usage:
- * <ProtectedRoute requiredRole="doctor">
- *   <DashboardContent />
+ * <ProtectedRoute requiredRole="patient">
+ *   <PatientDashboardContent />
  * </ProtectedRoute>
  */
 const ProtectedRoute = ({ children, requiredRole }) => {

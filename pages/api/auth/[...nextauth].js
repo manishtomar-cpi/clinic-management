@@ -1,8 +1,6 @@
-// pages/api/auth/[...nextauth].js
-
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { db } from '../../../src/db';
+import { db } from '../../../src/db'; // Adjust the path as necessary
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import bcrypt from 'bcryptjs';
 
@@ -43,8 +41,11 @@ export const authOptions = {
           // Return the user object with role
           return {
             id: userDoc.id,
+            name: userData.name, // Ensure this field exists
+            email: userData.email, // Ensure this field exists
             username: userData.username,
-            role: userData.role, // Ensure this field exists and is correctly set ('doctor' or 'patient')
+            role: userData.role, // Ensure this field exists and is set to 'doctor' or 'patient'
+            doctorName: userData.doctorName || '', // For patients, the associated doctor's name
           };
         } catch (error) {
           console.error('Login Error:', error);
@@ -65,8 +66,11 @@ export const authOptions = {
       // If a user object exists, this is the initial sign-in; set token properties
       if (user) {
         token.id = user.id;
+        token.name = user.name;
+        token.email = user.email;
         token.username = user.username;
         token.role = user.role; // Include role in JWT
+        token.doctorName = user.doctorName; // Include doctor's name for patients
       }
       return token;
     },
@@ -74,13 +78,16 @@ export const authOptions = {
       // Ensure custom properties are directly assigned to session.user
       if (token) {
         session.user.id = token.id;
+        session.user.name = token.name;
+        session.user.email = token.email;
         session.user.username = token.username;
         session.user.role = token.role; // Include role in session
+        session.user.doctorName = token.doctorName; // Include doctor's name for patients
       }
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET, // Ensure this is set in your environment variables
 };
 
 export default NextAuth(authOptions);
