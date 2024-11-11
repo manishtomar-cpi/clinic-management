@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     // Configure AWS SDK
     AWS.config.update({
       accessKeyId: process.env.MY_AWS_ACCESS_KEY_ID,
-      secretAccessKey: process.env.MY_AWS_SECRET_ACCESS_KEY, // Corrected
+      secretAccessKey: process.env.MY_AWS_SECRET_ACCESS_KEY, 
       region: process.env.MY_AWS_REGION,
     });
 

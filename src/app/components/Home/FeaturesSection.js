@@ -53,6 +53,49 @@ const FeaturesSection = () => {
     },
   ];
 
+  // Define variants for the container
+  const containerVariants = {
+    hidden: {},
+    visible: {
+      transition: {
+        staggerChildren: 0.2,
+      },
+    },
+  };
+
+  // Define variants for each feature item
+  const itemVariants = {
+    hidden: { opacity: 0, y: 50, scale: 0.95 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.6,
+        type: "spring",
+        stiffness: 100,
+      },
+    },
+  };
+
+  // Define hover animation
+  const hoverAnimation = {
+    scale: 1.05,
+    rotate: [0, 2, -2, 0], // Slight rotation for a playful effect
+    boxShadow: "0px 15px 25px rgba(0, 0, 0, 0.2)",
+    transition: {
+      duration: 0.3,
+      type: "spring",
+      stiffness: 300,
+    },
+  };
+
+  // Define icon animation
+  const iconVariants = {
+    rest: { rotate: 0 },
+    hover: { rotate: 360, transition: { duration: 1, ease: "linear" } },
+  };
+
   return (
     <section className="bg-gradient-to-b from-gray-50 to-gray-100 py-12 rounded-lg shadow-inner">
       <div className="container mx-auto px-4">
@@ -65,24 +108,35 @@ const FeaturesSection = () => {
         >
           Key Features
         </motion.h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+        >
           {features.map((feature, index) => (
             <motion.div
               key={index}
-              className="flex flex-col items-center bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition duration-300 transform hover:-translate-y-2"
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.2 }}
-              viewport={{ once: true }}
+              className="flex flex-col items-center bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300"
+              variants={itemVariants}
+              whileHover={hoverAnimation}
             >
-              {feature.icon}
+              <motion.div
+                variants={iconVariants}
+                initial="rest"
+                whileHover="hover"
+                className="mb-4"
+              >
+                {feature.icon}
+              </motion.div>
               <h3 className="text-2xl font-semibold mb-2 text-teal-700">
                 {feature.title}
               </h3>
               <p className="text-gray-600 text-center">{feature.description}</p>
             </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );
