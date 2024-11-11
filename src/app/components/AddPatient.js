@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { db } from '../../db';
 import {
   collection,
   addDoc,
+  setDoc,
+  doc,
   query,
   where,
   getDocs,
@@ -12,7 +14,7 @@ import {
 import { encryptData, decryptData } from '../../lib/encryption';
 import { useSession } from 'next-auth/react';
 import { showToast } from './Toast';
-import { FaUserPlus } from 'react-icons/fa';
+import { FaUserPlus, FaHeartbeat,  } from 'react-icons/fa';
 import Tooltip from './Tooltip';
 import bcrypt from 'bcryptjs';
 
@@ -34,17 +36,9 @@ const AddPatient = () => {
     password: '',
   });
   const [errors, setErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false); // Spinner state
-  const [showGeneratePrompt, setShowGeneratePrompt] = useState(false); // Prompt state
+  const [isSubmitting, setIsSubmitting] = useState(false); // Added state for spinner
 
-  useEffect(() => {
-    if (step === 4 && (!patientCredentials.username || !patientCredentials.password)) {
-      setShowGeneratePrompt(true);
-    } else {
-      setShowGeneratePrompt(false);
-    }
-  }, [step, patientCredentials]);
-
+  // Handle input changes for patient details
   const handleChange = (e) => {
     setPatientData({
       ...patientData,
@@ -57,6 +51,7 @@ const AddPatient = () => {
     });
   };
 
+  // Validate current step
   const validateStep = () => {
     let valid = true;
     let newErrors = {};
@@ -82,10 +77,7 @@ const AddPatient = () => {
         newErrors.mobileNumber = 'Please enter a valid 10-digit mobile number';
         valid = false;
       }
-      if (!patientData.email.trim()) {
-        newErrors.email = 'Email is required';
-        valid = false;
-      } else if (!/^\S+@\S+\.\S+$/.test(patientData.email)) {
+      if (patientData.email && !/^\S+@\S+\.\S+$/.test(patientData.email)) {
         newErrors.email = 'Please enter a valid email address';
         valid = false;
       }
@@ -98,15 +90,8 @@ const AddPatient = () => {
         newErrors.disease = 'Disease/Condition is required';
         valid = false;
       }
-      // Notes can be optional or add validation if required
-    } else if (step === 4) {
-      // Ensure credentials are generated before submission
-      if (!patientCredentials.username || !patientCredentials.password) {
-        valid = false;
-        showToast('Please generate credentials before submitting.', 'error');
-      }
+      // Notes can be optional
     }
-
     setErrors(newErrors);
     return valid;
   };
@@ -119,12 +104,14 @@ const AddPatient = () => {
 
   const prevStep = () => setStep(step - 1);
 
+  // Generate a unique username
   const generateRandomUsername = () => {
     const randomNum = Math.floor(1000 + Math.random() * 9000); // Random 4-digit number
     const namePart = patientData.name.split(' ')[0].toLowerCase(); // Use first name
     return `${namePart}${randomNum}`;
   };
 
+  // Generate a random password
   const generateRandomPassword = () => {
     const chars =
       'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()';
@@ -135,6 +122,7 @@ const AddPatient = () => {
     return password;
   };
 
+  // Check if username exists in 'users' collection
   const checkUsernameExists = async (username) => {
     const usersRef = collection(db, 'users');
     const q = query(usersRef, where('username', '==', username));
@@ -142,6 +130,7 @@ const AddPatient = () => {
     return !querySnapshot.empty;
   };
 
+  // Generate unique credentials
   const generateCredentials = async () => {
     let unique = false;
     let username = '';
@@ -156,9 +145,9 @@ const AddPatient = () => {
     }
 
     setPatientCredentials({ username, password });
-    setShowGeneratePrompt(false); // Hide prompt once generated
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true); // Start spinner
@@ -167,16 +156,6 @@ const AddPatient = () => {
     if (!validateStep()) {
       setIsSubmitting(false);
       return;
-    }
-
-    // Encrypt the sensitive data, but store email in plaintext
-    const encryptedData = {};
-    for (const key in patientData) {
-      if (key === 'email') {
-        encryptedData[key] = patientData[key]; // Store email in plaintext
-      } else {
-        encryptedData[key] = encryptData(patientData[key]);
-      }
     }
 
     try {
@@ -188,27 +167,34 @@ const AddPatient = () => {
         10
       );
 
-      // Combine patient data with credentials
-      const patientDocData = {
-        ...encryptedData,
+      // Add patient's credentials to 'users' collection
+      const patientUserDocRef = await addDoc(collection(db, 'users'), {
         username: patientCredentials.username,
         password: hashedPassword,
-        role: 'patient',
-        doctorId: doctorId,
+        email: patientData.email, // Store email as plaintext for communication
+        role: 'patient', // Add a role field to distinguish between doctors and patients
         createdAt: new Date(),
-        treatmentStatus: 'Ongoing', // Store as plaintext
-      };
+        doctorId: doctorId, // Link the patient to the doctor
+      });
 
-      // Add patient data to 'users' collection
-      await addDoc(collection(db, 'users'), patientDocData);
+      const patientId = patientUserDocRef.id;
+
+      // Encrypt the sensitive data
+      const encryptedData = {};
+      for (const key in patientData) {
+        encryptedData[key] = encryptData(patientData[key]);
+      }
+
+      // Add the patient to the doctor's patients collection using the same ID
+      await setDoc(doc(db, 'doctors', doctorId, 'patients', patientId), {
+        ...encryptedData,
+        treatmentStatus: 'Ongoing', // Store as plaintext
+        createdAt: new Date(),
+      });
 
       // Fetch doctor's data from 'users' collection
       const usersRef = collection(db, 'users');
-      const q = query(
-        usersRef,
-        where('username', '==', session.user.username),
-        where('role', '==', 'doctor')
-      );
+      const q = query(usersRef, where('username', '==', session.user.username));
       const querySnapshot = await getDocs(q);
       let doctorData = null;
 
@@ -241,6 +227,8 @@ const AddPatient = () => {
           patientName: patientData.name,
         }),
       });
+
+      const emailResult = await response.json();
 
       if (response.ok) {
         showToast('Patient added and email sent successfully!', 'success');
@@ -314,8 +302,7 @@ const AddPatient = () => {
               generateCredentials={generateCredentials}
               prevStep={prevStep}
               handleSubmit={handleSubmit}
-              isSubmitting={isSubmitting}
-              showGeneratePrompt={showGeneratePrompt}
+              isSubmitting={isSubmitting} // Pass isSubmitting to StepFour
             />
           )}
         </form>
@@ -324,6 +311,7 @@ const AddPatient = () => {
   );
 };
 
+// Progress Bar Component
 const ProgressBar = ({ step }) => {
   return (
     <div className="relative h-2 bg-gray-300 rounded-full mb-8 overflow-hidden">
@@ -335,6 +323,7 @@ const ProgressBar = ({ step }) => {
   );
 };
 
+// Step One Component
 const StepOne = ({ patientData, handleChange, nextStep, errors }) => (
   <>
     <InputField
@@ -364,6 +353,12 @@ const StepOne = ({ patientData, handleChange, nextStep, errors }) => (
       error={errors.gender}
       required
       tooltip="Select the patient's gender."
+      options={[
+        { value: '', label: 'Select Gender' },
+        { value: 'Male', label: 'Male' },
+        { value: 'Female', label: 'Female' },
+        { value: 'Other', label: 'Other' },
+      ]}
     />
     <div className="flex justify-end mt-6">
       <button
@@ -377,6 +372,7 @@ const StepOne = ({ patientData, handleChange, nextStep, errors }) => (
   </>
 );
 
+// Step Two Component (Contact Details)
 const StepTwo = ({ patientData, handleChange, nextStep, prevStep, errors }) => (
   <>
     <InputField
@@ -395,7 +391,6 @@ const StepTwo = ({ patientData, handleChange, nextStep, prevStep, errors }) => (
       value={patientData.email}
       onChange={handleChange}
       error={errors.email}
-      required
       tooltip="Enter the patient's email address."
     />
     <InputField
@@ -426,6 +421,7 @@ const StepTwo = ({ patientData, handleChange, nextStep, prevStep, errors }) => (
   </>
 );
 
+// Step Three Component (Medical Details)
 const StepThree = ({ patientData, handleChange, nextStep, prevStep, errors }) => (
   <>
     <InputField
@@ -445,41 +441,6 @@ const StepThree = ({ patientData, handleChange, nextStep, prevStep, errors }) =>
       error={errors.notes}
       tooltip="Any additional notes or comments."
     />
-    <div className="mt-6 p-4 bg-white rounded shadow">
-      <h3 className="text-xl font-bold mb-2 text-indigo-600">Review Information</h3>
-      <p>
-        <strong>Name:</strong> {patientData.name}
-      </p>
-      <p>
-        <strong>Age:</strong> {patientData.age}
-      </p>
-      <p>
-        <strong>Gender:</strong> {patientData.gender}
-      </p>
-      <p>
-        <strong>Mobile:</strong> {patientData.mobileNumber}
-      </p>
-      {patientData.email && (
-        <p>
-          <strong>Email:</strong> {patientData.email}
-        </p>
-      )}
-      {patientData.address && (
-        <p>
-          <strong>Address:</strong> {patientData.address}
-        </p>
-      )}
-      {patientData.disease && (
-        <p>
-          <strong>Disease:</strong> {patientData.disease}
-        </p>
-      )}
-      {patientData.notes && (
-        <p>
-          <strong>Notes:</strong> {patientData.notes}
-        </p>
-      )}
-    </div>
     <div className="flex justify-between mt-6">
       <button
         type="button"
@@ -499,6 +460,7 @@ const StepThree = ({ patientData, handleChange, nextStep, prevStep, errors }) =>
   </>
 );
 
+// Step Four Component (Review & Actions)
 const StepFour = ({
   patientData,
   patientCredentials,
@@ -506,13 +468,10 @@ const StepFour = ({
   prevStep,
   handleSubmit,
   isSubmitting,
-  showGeneratePrompt,
 }) => (
   <>
     <div className="mt-6 p-4 bg-white rounded shadow">
-      <h3 className="text-xl font-bold mb-4 text-indigo-600">
-        Create Patient Credentials
-      </h3>
+      <h3 className="text-xl font-bold mb-4 text-indigo-600">Create Patient Credentials</h3>
       {patientCredentials.username && patientCredentials.password ? (
         <>
           <p>
@@ -530,20 +489,13 @@ const StepFour = ({
           </button>
         </>
       ) : (
-        <>
-          {showGeneratePrompt && (
-            <p className="text-red-600 animate-pulse mb-4">
-              Please generate credentials before submitting.
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={generateCredentials}
-            className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700"
-          >
-            Generate Credentials
-          </button>
-        </>
+        <button
+          type="button"
+          onClick={generateCredentials}
+          className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700"
+        >
+          Generate Credentials
+        </button>
       )}
     </div>
     <div className="flex justify-between mt-6">
@@ -556,14 +508,8 @@ const StepFour = ({
       </button>
       <button
         type="submit"
-        className={`${
-          !patientCredentials.username || !patientCredentials.password || isSubmitting
-            ? 'bg-gray-400 cursor-not-allowed'
-            : 'bg-green-600 hover:bg-green-700'
-        } text-white py-2 px-4 rounded flex items-center justify-center`}
-        disabled={
-          !patientCredentials.username || !patientCredentials.password || isSubmitting
-        }
+        className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 flex items-center"
+        disabled={!patientCredentials.username || !patientCredentials.password || isSubmitting}
       >
         {isSubmitting ? (
           <>
@@ -590,19 +536,21 @@ const StepFour = ({
             Sending...
           </>
         ) : (
-          'Submit and Send Email'
+          <>
+            <FaHeartbeat className="text-xl mr-2" />
+            Submit and Send Email
+          </>
         )}
       </button>
     </div>
   </>
 );
 
+// Input Field Component
 const InputField = ({ label, error, tooltip, ...props }) => (
   <div className="relative mb-4">
     <div className="flex items-center">
-      <label className="block text-gray-700 font-semibold mb-1">
-        {label} {props.required && <span className="text-red-500">*</span>}
-      </label>
+      <label className="block text-gray-700 font-semibold mb-1">{label}</label>
       {tooltip && <Tooltip message={tooltip} />}
     </div>
     <input
@@ -615,12 +563,11 @@ const InputField = ({ label, error, tooltip, ...props }) => (
   </div>
 );
 
+// Textarea Field Component
 const TextareaField = ({ label, error, tooltip, ...props }) => (
   <div className="relative mb-4">
     <div className="flex items-center">
-      <label className="block text-gray-700 font-semibold mb-1">
-        {label} {props.required && <span className="text-red-500">*</span>}
-      </label>
+      <label className="block text-gray-700 font-semibold mb-1">{label}</label>
       {tooltip && <Tooltip message={tooltip} />}
     </div>
     <textarea
@@ -628,17 +575,25 @@ const TextareaField = ({ label, error, tooltip, ...props }) => (
       className={`w-full p-3 border ${
         error ? 'border-red-500' : 'border-gray-300'
       } rounded focus:outline-none focus:ring-2 focus:ring-indigo-400`}
-    />
+    ></textarea>
     {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
   </div>
 );
 
-const SelectField = ({ label, name, value, onChange, error, required, tooltip }) => (
+// Select Field Component
+const SelectField = ({
+  label,
+  name,
+  value,
+  onChange,
+  error,
+  required,
+  tooltip,
+  options,
+}) => (
   <div className="relative mb-4">
     <div className="flex items-center">
-      <label className="block text-gray-700 font-semibold mb-1">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
+      <label className="block text-gray-700 font-semibold mb-1">{label}</label>
       {tooltip && <Tooltip message={tooltip} />}
     </div>
     <select
@@ -650,10 +605,11 @@ const SelectField = ({ label, name, value, onChange, error, required, tooltip })
         error ? 'border-red-500' : 'border-gray-300'
       } rounded focus:outline-none focus:ring-2 focus:ring-indigo-400`}
     >
-      <option value="">Select Gender</option>
-      <option value="Male">Male</option>
-      <option value="Female">Female</option>
-      <option value="Other">Other</option>
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
     </select>
     {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
   </div>

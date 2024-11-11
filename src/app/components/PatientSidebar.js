@@ -69,9 +69,9 @@ const PatientSidebar = () => {
 
       {/* Desktop Sidebar */}
       <div className="hidden md:flex flex-col fixed top-0 left-0 h-full w-64 bg-white shadow-lg z-30">
-        <div className="flex items-center justify-center h-20 bg-gradient-to-r from-pink-500 to-purple-600">
+        {/* <div className="flex items-center justify-center h-20 bg-gradient-to-r from-pink-500 to-purple-600">
           <FaHeart size={32} color="white" />
-        </div>
+        </div> */}
         <nav className="flex-1 px-2 py-4 space-y-1">
           {menuItems.map((item, idx) => (
             <motion.button
@@ -106,9 +106,9 @@ const PatientSidebar = () => {
             exit={{ x: '-100%' }}
           >
             <div className="flex flex-col h-full">
-              <div className="flex items-center justify-center h-20 bg-gradient-to-r from-pink-500 to-purple-600">
+              {/* <div className="flex items-center justify-center h-20 bg-gradient-to-r from-pink-500 to-purple-600">
                 <FaHeart size={32} color="white" />
-              </div>
+              </div> */}
               <nav className="flex-1 px-2 py-4 space-y-1">
                 {menuItems.map((item, idx) => (
                   <motion.button

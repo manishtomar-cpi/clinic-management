@@ -1,4 +1,3 @@
-// PatientDashboardContent.jsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -57,74 +56,87 @@ const PatientDashboardContent = () => {
         }
 
         try {
-          const userId = session.user.id;
-          const doctorId = session.user.doctorId;
+          const userId = session.user.id; // Patient's user ID
+          let doctorId = null;
 
-          // Fetch patient data from 'users' collection
-          const patientDocRef = doc(db, 'users', userId);
-          const patientDoc = await getDoc(patientDocRef);
+          // Fetch patient data from 'users' collection to get doctorId
+          const patientUserDocRef = doc(db, 'users', userId);
+          const patientUserDoc = await getDoc(patientUserDocRef);
 
-          if (patientDoc.exists()) {
-            const data = patientDoc.data();
-            const decryptedData = {};
-            for (const key in data) {
-              if (
-                key !== 'treatmentStatus' &&
-                key !== 'createdAt' &&
-                key !== 'username' &&
-                key !== 'password' &&
-                key !== 'role' &&
-                key !== 'doctorId'
-              ) {
-                decryptedData[key] = decryptData(data[key]);
-              } else {
-                decryptedData[key] = data[key];
-              }
-            }
-            setPatientData({
-              name: decryptedData.name || '',
-              age: decryptedData.age || '',
-              gender: decryptedData.gender || '',
-              address: decryptedData.address || '',
-              mobileNumber: decryptedData.mobileNumber || '',
-              email: decryptedData.email || '',
-              disease: decryptedData.disease || '',
-              notes: decryptedData.notes || '',
-            });
-          } else {
-            showToast('Patient data not found', 'error');
-          }
+          if (patientUserDoc.exists()) {
+            const userData = patientUserDoc.data();
+            doctorId = userData.doctorId;
 
-          if (doctorId) {
-            // Fetch doctor's data from 'users' collection
-            const doctorDocRef = doc(db, 'users', doctorId);
-            const doctorDoc = await getDoc(doctorDocRef);
+            if (doctorId) {
+              // Fetch patient data from 'doctors/{doctorId}/patients/{patientId}'
+              const patientDocRef = doc(
+                db,
+                'doctors',
+                doctorId,
+                'patients',
+                userId
+              );
+              const patientDoc = await getDoc(patientDocRef);
 
-            if (doctorDoc.exists()) {
-              const data = doctorDoc.data();
-              const decryptedData = {};
-              for (const key in data) {
-                if (
-                  key !== 'createdAt' &&
-                  key !== 'username' &&
-                  key !== 'password' &&
-                  key !== 'role'
-                ) {
-                  decryptedData[key] = decryptData(data[key]);
-                } else {
-                  decryptedData[key] = data[key];
+              if (patientDoc.exists()) {
+                const data = patientDoc.data();
+                const decryptedData = {};
+                for (const key in data) {
+                  if (
+                    key !== 'treatmentStatus' &&
+                    key !== 'createdAt'
+                  ) {
+                    decryptedData[key] = decryptData(data[key]);
+                  } else {
+                    decryptedData[key] = data[key];
+                  }
                 }
+                setPatientData({
+                  name: decryptedData.name || '',
+                  age: decryptedData.age || '',
+                  gender: decryptedData.gender || '',
+                  address: decryptedData.address || '',
+                  mobileNumber: decryptedData.mobileNumber || '',
+                  email: decryptedData.email || '',
+                  disease: decryptedData.disease || '',
+                  notes: decryptedData.notes || '',
+                });
+              } else {
+                showToast('Patient data not found', 'error');
               }
-              setDoctorData({
-                doctorName: decryptedData.doctorName || '',
-                clinicName: decryptedData.clinicName || '',
-                clinicLocation: decryptedData.clinicLocation || '',
-              });
+
+              // Fetch doctor's data from 'users' collection
+              const doctorDocRef = doc(db, 'users', doctorId);
+              const doctorDoc = await getDoc(doctorDocRef);
+
+              if (doctorDoc.exists()) {
+                const data = doctorDoc.data();
+                const decryptedData = {};
+                for (const key in data) {
+                  if (
+                    key !== 'createdAt' &&
+                    key !== 'username' &&
+                    key !== 'password' &&
+                    key !== 'role'
+                  ) {
+                    decryptedData[key] = decryptData(data[key]);
+                  } else {
+                    decryptedData[key] = data[key];
+                  }
+                }
+                setDoctorData({
+                  doctorName: decryptedData.doctorName || '',
+                  clinicName: decryptedData.clinicName || '',
+                  clinicLocation: decryptedData.clinicLocation || '',
+                });
+              } else {
+                showToast('Doctor data not found', 'error');
+              }
             } else {
-              showToast('Doctor data not found', 'error');
+              showToast('Doctor ID not found in user data', 'error');
             }
           } else {
-            showToast('Doctor ID not found', 'error');
+            showToast('User data not found', 'error');
           }
 
           setIsLoading(false);
@@ -139,7 +151,7 @@ const PatientDashboardContent = () => {
     };
 
     fetchPatientAndDoctorData();
-  }, [status, session]);
+  }, [status, session, router]);
 
   if (isLoading) {
     return <MedicalSpinner />;
@@ -279,6 +291,7 @@ const PatientDashboardContent = () => {
   );
 };
 
+// Info Card Component
 const InfoCard = ({ label, value, icon, gradient }) => (
   <motion.div
     className={`flex items-center p-4 rounded-lg shadow hover:shadow-lg transition-shadow bg-gradient-to-r ${gradient} text-white`}
