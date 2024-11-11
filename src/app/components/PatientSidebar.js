@@ -1,3 +1,4 @@
+// PatientSidebar.jsx
 'use client';
 
 import React, { useState } from 'react';
@@ -10,7 +11,7 @@ import {
 import { FiMenu, FiX } from 'react-icons/fi';
 import { useRouter } from 'next/navigation';
 import { signOut } from 'next-auth/react';
-import { showToast } from './Toast'; // Ensure this utility exists
+import { showToast } from './Toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const PatientSidebar = () => {
@@ -20,20 +21,19 @@ const PatientSidebar = () => {
   const menuItems = [
     {
       name: 'Dashboard',
-      icon: <FaHome color="#FF6347" />, // Tomato
+      icon: <FaHome color="#FF6347" />,
       component: 'Dashboard',
     },
     {
       name: 'My Appointments',
-      icon: <FaCalendarCheck color="#32CD32" />, // LimeGreen
+      icon: <FaCalendarCheck color="#32CD32" />,
       component: 'MyAppointments',
     },
     {
       name: 'Health Records',
-      icon: <FaHeart color="#1E90FF" />, // DodgerBlue
+      icon: <FaHeart color="#1E90FF" />,
       component: 'HealthRecords',
     },
-    // Add more patient-specific menu items here
   ];
 
   const handleMenuItemClick = (component) => {
@@ -41,13 +41,15 @@ const PatientSidebar = () => {
     if (component === 'Logout') {
       handleLogout();
     } else {
-      router.push(`/patient-dashboard/${component.toLowerCase()}`); // Adjust routes as necessary
+      router.push(`/patient-dashboard/${component.toLowerCase()}`);
     }
   };
 
   const handleLogout = async () => {
     try {
-      await signOut({ callbackUrl: '/patient-login' });
+      // Sign out without redirecting
+      await signOut({ redirect: false });
+      router.push('/patient-login'); // Manually redirect
       showToast('You have successfully logged out!', 'success');
     } catch (error) {
       console.error('Logout Error:', error);
@@ -59,8 +61,7 @@ const PatientSidebar = () => {
     <>
       {/* Mobile Navbar */}
       <div className="md:hidden flex items-center justify-between bg-white p-4 shadow w-full fixed top-0 z-40">
-        {/* Removed "ClinicEase" branding */}
-        <h1 className="text-xl font-bold text-indigo-600">ClinicEase</h1> {/* Optional: Replace with logo */}
+        <h1 className="text-xl font-bold text-indigo-600">ClinicEase</h1>
         <button onClick={() => setIsOpen(!isOpen)}>
           {isOpen ? <FiX size={24} /> : <FiMenu size={24} />}
         </button>
@@ -68,9 +69,7 @@ const PatientSidebar = () => {
 
       {/* Desktop Sidebar */}
       <div className="hidden md:flex flex-col fixed top-0 left-0 h-full w-64 bg-white shadow-lg z-30">
-        {/* Optional: Replace with logo or remove */}
         <div className="flex items-center justify-center h-20 bg-gradient-to-r from-pink-500 to-purple-600">
-          {/* Removed "ClinicEase" text */}
           <FaHeart size={32} color="white" />
         </div>
         <nav className="flex-1 px-2 py-4 space-y-1">
@@ -87,11 +86,11 @@ const PatientSidebar = () => {
           ))}
           {/* Logout Button */}
           <motion.button
-            onClick={() => handleMenuItemClick('Logout')}
-            className="flex items-center p-2 text-base font-medium text-gray-700 rounded-lg hover:bg-gradient-to-r hover:from-pink-500 hover:to-purple-600 hover:text-white transition-colors w-full mt-4 focus:outline-none"
+            onClick={handleLogout}
+            className="flex items-center p-2 text-base font-medium text-gray-700 rounded-lg hover:bg-gradient-to-r hover:from-red-500 hover:to-red-600 hover:text-white transition-colors w-full mt-4 focus:outline-none"
             whileHover={{ scale: 1.05 }}
           >
-            <FaSignOutAlt size={20} color="#FF4500" /> {/* OrangeRed */}
+            <FaSignOutAlt size={20} color="#FF4500" />
             <span className="ml-3">Logout</span>
           </motion.button>
         </nav>
@@ -107,9 +106,7 @@ const PatientSidebar = () => {
             exit={{ x: '-100%' }}
           >
             <div className="flex flex-col h-full">
-              {/* Optional: Replace with logo or remove */}
               <div className="flex items-center justify-center h-20 bg-gradient-to-r from-pink-500 to-purple-600">
-                {/* Removed "ClinicEase" text */}
                 <FaHeart size={32} color="white" />
               </div>
               <nav className="flex-1 px-2 py-4 space-y-1">
@@ -126,8 +123,8 @@ const PatientSidebar = () => {
                 ))}
                 {/* Logout Button */}
                 <motion.button
-                  onClick={() => handleMenuItemClick('Logout')}
-                  className="flex items-center p-2 text-base font-medium text-gray-700 rounded-lg hover:bg-gradient-to-r hover:from-pink-500 hover:to-purple-600 hover:text-white transition-colors w-full mt-4 focus:outline-none"
+                  onClick={handleLogout}
+                  className="flex items-center p-2 text-base font-medium text-gray-700 rounded-lg hover:bg-gradient-to-r hover:from-red-500 hover:to-red-600 hover:text-white transition-colors w-full mt-4 focus:outline-none"
                   whileHover={{ scale: 1.05 }}
                 >
                   <FaSignOutAlt size={20} color="#FF4500" />

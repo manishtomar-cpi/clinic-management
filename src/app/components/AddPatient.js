@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '../../db';
 import {
   collection,
@@ -35,7 +34,16 @@ const AddPatient = () => {
     password: '',
   });
   const [errors, setErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false); // Added state for spinner
+  const [isSubmitting, setIsSubmitting] = useState(false); // Spinner state
+  const [showGeneratePrompt, setShowGeneratePrompt] = useState(false); // Prompt state
+
+  useEffect(() => {
+    if (step === 4 && (!patientCredentials.username || !patientCredentials.password)) {
+      setShowGeneratePrompt(true);
+    } else {
+      setShowGeneratePrompt(false);
+    }
+  }, [step, patientCredentials]);
 
   const handleChange = (e) => {
     setPatientData({
@@ -74,13 +82,31 @@ const AddPatient = () => {
         newErrors.mobileNumber = 'Please enter a valid 10-digit mobile number';
         valid = false;
       }
-      if (patientData.email && !/^\S+@\S+\.\S+$/.test(patientData.email)) {
+      if (!patientData.email.trim()) {
+        newErrors.email = 'Email is required';
+        valid = false;
+      } else if (!/^\S+@\S+\.\S+$/.test(patientData.email)) {
         newErrors.email = 'Please enter a valid email address';
         valid = false;
       }
+      if (!patientData.address.trim()) {
+        newErrors.address = 'Address is required';
+        valid = false;
+      }
     } else if (step === 3) {
-      // Add any validation for step 3 if necessary
+      if (!patientData.disease.trim()) {
+        newErrors.disease = 'Disease/Condition is required';
+        valid = false;
+      }
+      // Notes can be optional or add validation if required
+    } else if (step === 4) {
+      // Ensure credentials are generated before submission
+      if (!patientCredentials.username || !patientCredentials.password) {
+        valid = false;
+        showToast('Please generate credentials before submitting.', 'error');
+      }
     }
+
     setErrors(newErrors);
     return valid;
   };
@@ -130,6 +156,7 @@ const AddPatient = () => {
     }
 
     setPatientCredentials({ username, password });
+    setShowGeneratePrompt(false); // Hide prompt once generated
   };
 
   const handleSubmit = async (e) => {
@@ -142,19 +169,18 @@ const AddPatient = () => {
       return;
     }
 
-    // Encrypt the sensitive data
+    // Encrypt the sensitive data, but store email in plaintext
     const encryptedData = {};
     for (const key in patientData) {
-      encryptedData[key] = encryptData(patientData[key]);
+      if (key === 'email') {
+        encryptedData[key] = patientData[key]; // Store email in plaintext
+      } else {
+        encryptedData[key] = encryptData(patientData[key]);
+      }
     }
 
     try {
       const doctorId = session.user.id;
-      await addDoc(collection(db, 'doctors', doctorId, 'patients'), {
-        ...encryptedData,
-        treatmentStatus: 'Ongoing', // Store as plaintext
-        createdAt: new Date(),
-      });
 
       // Hash the patient's password
       const hashedPassword = await bcrypt.hash(
@@ -162,19 +188,27 @@ const AddPatient = () => {
         10
       );
 
-      // Add patient's credentials to 'users' collection
-      await addDoc(collection(db, 'users'), {
+      // Combine patient data with credentials
+      const patientDocData = {
+        ...encryptedData,
         username: patientCredentials.username,
         password: hashedPassword,
-        email: patientData.email, // Store email as plaintext for communication
-        role: 'patient', // Add a role field to distinguish between doctors and patients
+        role: 'patient',
+        doctorId: doctorId,
         createdAt: new Date(),
-        doctorId: doctorId, // Link the patient to the doctor
-      });
+        treatmentStatus: 'Ongoing', // Store as plaintext
+      };
+
+      // Add patient data to 'users' collection
+      await addDoc(collection(db, 'users'), patientDocData);
 
       // Fetch doctor's data from 'users' collection
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('username', '==', session.user.username));
+      const q = query(
+        usersRef,
+        where('username', '==', session.user.username),
+        where('role', '==', 'doctor')
+      );
       const querySnapshot = await getDocs(q);
       let doctorData = null;
 
@@ -207,8 +241,6 @@ const AddPatient = () => {
           patientName: patientData.name,
         }),
       });
-
-      const emailResult = await response.json();
 
       if (response.ok) {
         showToast('Patient added and email sent successfully!', 'success');
@@ -282,7 +314,8 @@ const AddPatient = () => {
               generateCredentials={generateCredentials}
               prevStep={prevStep}
               handleSubmit={handleSubmit}
-              isSubmitting={isSubmitting} // Pass isSubmitting to StepFour
+              isSubmitting={isSubmitting}
+              showGeneratePrompt={showGeneratePrompt}
             />
           )}
         </form>
@@ -362,6 +395,7 @@ const StepTwo = ({ patientData, handleChange, nextStep, prevStep, errors }) => (
       value={patientData.email}
       onChange={handleChange}
       error={errors.email}
+      required
       tooltip="Enter the patient's email address."
     />
     <InputField
@@ -370,6 +404,7 @@ const StepTwo = ({ patientData, handleChange, nextStep, prevStep, errors }) => (
       value={patientData.address}
       onChange={handleChange}
       error={errors.address}
+      required
       tooltip="Enter the patient's residential address."
     />
     <div className="flex justify-between mt-6">
@@ -399,6 +434,7 @@ const StepThree = ({ patientData, handleChange, nextStep, prevStep, errors }) =>
       value={patientData.disease}
       onChange={handleChange}
       error={errors.disease}
+      required
       tooltip="Enter the patient's disease or condition."
     />
     <TextareaField
@@ -470,10 +506,13 @@ const StepFour = ({
   prevStep,
   handleSubmit,
   isSubmitting,
+  showGeneratePrompt,
 }) => (
   <>
     <div className="mt-6 p-4 bg-white rounded shadow">
-      <h3 className="text-xl font-bold mb-4 text-indigo-600">Create Patient Credentials</h3>
+      <h3 className="text-xl font-bold mb-4 text-indigo-600">
+        Create Patient Credentials
+      </h3>
       {patientCredentials.username && patientCredentials.password ? (
         <>
           <p>
@@ -491,13 +530,20 @@ const StepFour = ({
           </button>
         </>
       ) : (
-        <button
-          type="button"
-          onClick={generateCredentials}
-          className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700"
-        >
-          Generate Credentials
-        </button>
+        <>
+          {showGeneratePrompt && (
+            <p className="text-red-600 animate-pulse mb-4">
+              Please generate credentials before submitting.
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={generateCredentials}
+            className="bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700"
+          >
+            Generate Credentials
+          </button>
+        </>
       )}
     </div>
     <div className="flex justify-between mt-6">
@@ -510,8 +556,14 @@ const StepFour = ({
       </button>
       <button
         type="submit"
-        className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 flex items-center justify-center"
-        disabled={!patientCredentials.username || !patientCredentials.password || isSubmitting}
+        className={`${
+          !patientCredentials.username || !patientCredentials.password || isSubmitting
+            ? 'bg-gray-400 cursor-not-allowed'
+            : 'bg-green-600 hover:bg-green-700'
+        } text-white py-2 px-4 rounded flex items-center justify-center`}
+        disabled={
+          !patientCredentials.username || !patientCredentials.password || isSubmitting
+        }
       >
         {isSubmitting ? (
           <>
@@ -548,7 +600,9 @@ const StepFour = ({
 const InputField = ({ label, error, tooltip, ...props }) => (
   <div className="relative mb-4">
     <div className="flex items-center">
-      <label className="block text-gray-700 font-semibold mb-1">{label}</label>
+      <label className="block text-gray-700 font-semibold mb-1">
+        {label} {props.required && <span className="text-red-500">*</span>}
+      </label>
       {tooltip && <Tooltip message={tooltip} />}
     </div>
     <input
@@ -564,7 +618,9 @@ const InputField = ({ label, error, tooltip, ...props }) => (
 const TextareaField = ({ label, error, tooltip, ...props }) => (
   <div className="relative mb-4">
     <div className="flex items-center">
-      <label className="block text-gray-700 font-semibold mb-1">{label}</label>
+      <label className="block text-gray-700 font-semibold mb-1">
+        {label} {props.required && <span className="text-red-500">*</span>}
+      </label>
       {tooltip && <Tooltip message={tooltip} />}
     </div>
     <textarea
@@ -580,7 +636,9 @@ const TextareaField = ({ label, error, tooltip, ...props }) => (
 const SelectField = ({ label, name, value, onChange, error, required, tooltip }) => (
   <div className="relative mb-4">
     <div className="flex items-center">
-      <label className="block text-gray-700 font-semibold mb-1">{label}</label>
+      <label className="block text-gray-700 font-semibold mb-1">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
       {tooltip && <Tooltip message={tooltip} />}
     </div>
     <select
