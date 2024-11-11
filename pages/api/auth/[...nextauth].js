@@ -1,8 +1,15 @@
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { db } from '../../../src/db'; // Adjust the path as necessary
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../../src/db'; 
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+} from 'firebase/firestore';
 import bcrypt from 'bcryptjs';
+import { decryptData } from '../../../src/lib/encryption'; 
 
 export const authOptions = {
   providers: [
@@ -38,14 +45,32 @@ export const authOptions = {
             throw new Error('Invalid credentials');
           }
 
-          // Return the user object with role
+          // If user is a patient, fetch the associated doctor's name and doctorId
+          let doctorName = '';
+          let doctorId = '';
+
+          if (userData.role === 'patient') {
+            doctorId = userData.doctorId;
+            if (doctorId) {
+              const doctorDocRef = doc(db, 'users', doctorId);
+              const doctorDoc = await getDocs(query(collection(db, 'users'), where('id', '==', doctorId)));
+
+              if (!doctorDoc.empty) {
+                const doctorData = doctorDoc.docs[0].data();
+                doctorName = decryptData(doctorData.doctorName);
+              }
+            }
+          }
+
+          // Return the user object with role, doctorName, doctorId
           return {
             id: userDoc.id,
-            name: userData.name, // Ensure this field exists
-            email: userData.email, // Ensure this field exists
+            name: decryptData(userData.name),
+            email: decryptData(userData.email),
             username: userData.username,
-            role: userData.role, // Ensure this field exists and is set to 'doctor' or 'patient'
-            doctorName: userData.doctorName || '', // For patients, the associated doctor's name
+            role: userData.role,
+            doctorName: doctorName, // For patients
+            doctorId: doctorId, // For patients
           };
         } catch (error) {
           console.error('Login Error:', error);
@@ -55,7 +80,7 @@ export const authOptions = {
     }),
   ],
   pages: {
-    signIn: '/login', // Adjust as needed
+    signIn: '/patient-login', // Adjust as needed
   },
   session: {
     strategy: 'jwt',
@@ -63,31 +88,31 @@ export const authOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
-      // If a user object exists, this is the initial sign-in; set token properties
       if (user) {
         token.id = user.id;
         token.name = user.name;
         token.email = user.email;
         token.username = user.username;
-        token.role = user.role; // Include role in JWT
-        token.doctorName = user.doctorName; // Include doctor's name for patients
+        token.role = user.role;
+        token.doctorName = user.doctorName;
+        token.doctorId = user.doctorId;
       }
       return token;
     },
     async session({ session, token }) {
-      // Ensure custom properties are directly assigned to session.user
       if (token) {
         session.user.id = token.id;
         session.user.name = token.name;
         session.user.email = token.email;
         session.user.username = token.username;
-        session.user.role = token.role; // Include role in session
-        session.user.doctorName = token.doctorName; // Include doctor's name for patients
+        session.user.role = token.role;
+        session.user.doctorName = token.doctorName;
+        session.user.doctorId = token.doctorId;
       }
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET, // Ensure this is set in your environment variables
+  secret: process.env.NEXTAUTH_SECRET, 
 };
 
 export default NextAuth(authOptions);

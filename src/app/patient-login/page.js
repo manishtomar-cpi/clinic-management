@@ -13,11 +13,11 @@ import {
 } from 'react-icons/fa';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import Link from 'next/link';
-import { signIn, useSession, signOut } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import debounce from 'lodash.debounce';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const PatientLogin = () => {
   const { data: session, status } = useSession();
@@ -305,19 +305,36 @@ const PatientLogin = () => {
       <ToastContainer position="top-right" autoClose={5000} hideProgressBar />
 
       {/* Left Side - Static Image */}
-      <div className="hidden md:flex fixed top-0 left-0 w-1/2 h-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex-col justify-center items-center p-8">
+      <motion.div
+        className="hidden md:flex fixed top-0 left-0 w-1/2 h-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex-col justify-center items-center p-8"
+        initial={{ x: '-100%' }}
+        animate={{ x: 0 }}
+        transition={{ duration: 1 }}
+      >
         {/* Creative Content */}
-        <div className="text-center animate__animated animate__fadeInLeft">
-          <FaHeartbeat className="text-8xl mb-6 animate-bounce" />
-          <h2 className="text-4xl font-bold mb-4">Welcome to HealthConnect</h2>
-          <p className="text-lg md:text-xl">
-            Access your health records, schedule appointments, and manage your wellness journey seamlessly.
-          </p>
+        <div className="text-center">
+          <motion.div
+            className="text-center animate__animated animate__fadeInLeft"
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1 }}
+          >
+            <FaHeartbeat className="text-8xl mb-6 animate-bounce" />
+            <h2 className="text-4xl font-bold mb-4">Welcome to ClinicEase</h2>
+            <p className="text-lg md:text-xl">
+              Access your health records, schedule appointments, and manage your wellness journey seamlessly.
+            </p>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Right Side - Login Form */}
-      <div className="w-full md:w-1/2 ml-0 md:ml-[50%] h-full overflow-y-auto flex justify-center items-center p-8">
+      <motion.div
+        className="w-full md:w-1/2 ml-0 md:ml-[50%] h-full overflow-y-auto flex justify-center items-center p-8"
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        transition={{ duration: 1 }}
+      >
         <form onSubmit={handleSubmit} className="bg-white shadow-md rounded-lg p-8 w-full max-w-lg">
           <h2 className="text-3xl font-semibold text-gray-800 mb-6 text-center">
             Patient Login
@@ -395,7 +412,7 @@ const PatientLogin = () => {
           </button>
 
           {/* Forgot Password Link */}
-          <div className="mt-4 text-right">
+          <div className="mt-4 text-center">
             <button
               type="button"
               onClick={() => setShowForgotPassword(true)}
@@ -404,247 +421,249 @@ const PatientLogin = () => {
               Forgot Password?
             </button>
           </div>
-
-          {/* Navigation Links */}
-          <div className="mt-6 text-center">
-            <p className="text-gray-600">
-              <Link href="/" className="text-blue-600 hover:underline">
-                Back to Home
-              </Link>
-            </p>
-          </div>
         </form>
-      </div>
+      </motion.div>
 
       {/* Forgot Password Modal */}
-      {showForgotPassword && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div
-            ref={modalRef}
-            className="bg-white rounded-lg shadow-lg w-11/12 max-w-md p-6 relative animate__animated animate__fadeInDown"
+      <AnimatePresence>
+        {showForgotPassword && (
+          <motion.div
+            className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            <button
-              onClick={resetForgotPassword}
-              className="absolute top-3 right-3 text-gray-600 hover:text-gray-800"
-              aria-label="Close Modal"
+            <motion.div
+              ref={modalRef}
+              className="bg-white rounded-lg shadow-lg w-11/12 max-w-md p-6 relative"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              transition={{ duration: 0.3 }}
             >
-              <FaTimes size={20} />
-            </button>
+              <button
+                onClick={resetForgotPassword}
+                className="absolute top-3 right-3 text-gray-600 hover:text-gray-800"
+                aria-label="Close Modal"
+              >
+                <FaTimes size={20} />
+              </button>
 
-            {step === 1 && (
-              <>
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4 text-center">
-                  Forgot Password
-                </h2>
-                <p className="text-gray-600 mb-4 text-center">
-                  Enter your username below and we'll send you an OTP to reset your password.
-                </p>
-                <form onSubmit={handleForgotPasswordSubmit}>
-                  <div className="mb-4">
-                    <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
-                      htmlFor="forgotUsername"
-                    >
-                      Username
-                    </label>
-                    <div className="flex items-center bg-gray-100 p-2 rounded">
-                      <FaUser className="text-blue-500 mr-2" />
-                      <input
-                        type="text"
-                        name="forgotUsername"
-                        id="forgotUsername"
-                        value={forgotUsername}
-                        onChange={handleForgotUsernameChange}
-                        placeholder="Enter your username"
-                        required
-                        className="bg-gray-100 focus:outline-none w-full"
-                      />
-                    </div>
-                    {forgotUsernameError && (
-                      <p className="text-red-500 text-xs mt-1">{forgotUsernameError}</p>
-                    )}
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isSendingOtp}
-                    className={`w-full flex justify-center items-center bg-gradient-to-br from-pink-500 to-purple-600 text-white py-2 rounded-lg font-medium transition duration-300 shadow-lg ${
-                      isSendingOtp
-                        ? 'cursor-not-allowed opacity-50'
-                        : 'hover:bg-gradient-to-br hover:from-pink-600 hover:to-purple-700'
-                    }`}
-                  >
-                    {isSendingOtp ? (
-                      <>
-                        <FaSpinner className="animate-spin mr-2" />
-                        Sending OTP...
-                      </>
-                    ) : (
-                      <>
-                        <FaEnvelope className="text-xl mr-2" />
-                        Send OTP
-                      </>
-                    )}
-                  </button>
-                </form>
-              </>
-            )}
-
-            {step === 2 && (
-              <>
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4 text-center">
-                  Enter OTP
-                </h2>
-                <p className="text-gray-600 mb-4 text-center">
-                  Enter the OTP sent to your email to verify your identity.
-                </p>
-                <form onSubmit={handleVerifyOtp}>
-                  <div className="mb-4">
-                    <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="otp">
-                      OTP
-                    </label>
-                    <div className="flex items-center bg-gray-100 p-2 rounded">
-                      <FaEnvelope className="text-purple-500 mr-2" />
-                      <input
-                        type="text"
-                        name="otp"
-                        id="otp"
-                        value={otp}
-                        onChange={handleOtpChange}
-                        placeholder="Enter the OTP"
-                        required
-                        className="bg-gray-100 focus:outline-none w-full"
-                        maxLength={6}
-                      />
-                    </div>
-                    {otpError && (
-                      <p className="text-red-500 text-xs mt-1">{otpError}</p>
-                    )}
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isVerifyingOtp}
-                    className={`w-full flex justify-center items-center bg-gradient-to-br from-pink-500 to-purple-600 text-white py-2 rounded-lg font-medium transition duration-300 shadow-lg ${
-                      isVerifyingOtp
-                        ? 'cursor-not-allowed opacity-50'
-                        : 'hover:bg-gradient-to-br hover:from-pink-600 hover:to-purple-700'
-                    }`}
-                  >
-                    {isVerifyingOtp ? (
-                      <>
-                        <FaSpinner className="animate-spin mr-2" />
-                        Verifying...
-                      </>
-                    ) : (
-                      <>
-                        <FaEnvelope className="text-xl mr-2" />
-                        Verify OTP
-                      </>
-                    )}
-                  </button>
-                </form>
-              </>
-            )}
-
-            {step === 3 && (
-              <>
-                <h2 className="text-2xl font-semibold text-gray-800 mb-4 text-center">
-                  Reset Password
-                </h2>
-                <p className="text-gray-600 mb-4 text-center">
-                  Enter your new password below.
-                </p>
-                <form onSubmit={handleResetPassword}>
-                  <div className="mb-4">
-                    <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
-                      htmlFor="newPassword"
-                    >
-                      New Password
-                    </label>
-                    <div className="flex items-center bg-gray-100 p-2 rounded relative">
-                      <FaLock className="text-red-500 mr-2" />
-                      <input
-                        type={showNewPassword ? 'text' : 'password'}
-                        name="newPassword"
-                        id="newPassword"
-                        value={newPassword}
-                        onChange={handleNewPasswordChange}
-                        placeholder="Enter your new password"
-                        required
-                        className="bg-gray-100 focus:outline-none w-full"
-                      />
-                      <button
-                        type="button"
-                        onClick={toggleNewPasswordVisibility}
-                        className="absolute right-2 text-gray-600 hover:text-gray-800"
-                        aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+              {step === 1 && (
+                <>
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-4 text-center">
+                    Forgot Password
+                  </h2>
+                  <p className="text-gray-600 mb-4 text-center">
+                    Enter your username below and we'll send you an OTP to reset your password.
+                  </p>
+                  <form onSubmit={handleForgotPasswordSubmit}>
+                    <div className="mb-4">
+                      <label
+                        className="block text-gray-700 text-sm font-bold mb-2"
+                        htmlFor="forgotUsername"
                       >
-                        {showNewPassword ? <FaEyeSlash /> : <FaEye />}
-                      </button>
+                        Username
+                      </label>
+                      <div className="flex items-center bg-gray-100 p-2 rounded">
+                        <FaUser className="text-blue-500 mr-2" />
+                        <input
+                          type="text"
+                          name="forgotUsername"
+                          id="forgotUsername"
+                          value={forgotUsername}
+                          onChange={handleForgotUsernameChange}
+                          placeholder="Enter your username"
+                          required
+                          className="bg-gray-100 focus:outline-none w-full"
+                        />
+                      </div>
+                      {forgotUsernameError && (
+                        <p className="text-red-500 text-xs mt-1">{forgotUsernameError}</p>
+                      )}
                     </div>
-                    {newPasswordError && (
-                      <p className="text-red-500 text-xs mt-1">{newPasswordError}</p>
-                    )}
-                  </div>
-                  <div className="mb-4">
-                    <label
-                      className="block text-gray-700 text-sm font-bold mb-2"
-                      htmlFor="confirmNewPassword"
+                    <button
+                      type="submit"
+                      disabled={isSendingOtp}
+                      className={`w-full flex justify-center items-center bg-gradient-to-br from-pink-500 to-purple-600 text-white py-2 rounded-lg font-medium transition duration-300 shadow-lg ${
+                        isSendingOtp
+                          ? 'cursor-not-allowed opacity-50'
+                          : 'hover:bg-gradient-to-br hover:from-pink-600 hover:to-purple-700'
+                      }`}
                     >
-                      Confirm New Password
-                    </label>
-                    <div className="flex items-center bg-gray-100 p-2 rounded relative">
-                      <FaLock className="text-red-500 mr-2" />
-                      <input
-                        type={showConfirmNewPassword ? 'text' : 'password'}
-                        name="confirmNewPassword"
-                        id="confirmNewPassword"
-                        value={confirmNewPassword}
-                        onChange={handleConfirmNewPasswordChange}
-                        placeholder="Confirm your new password"
-                        required
-                        className="bg-gray-100 focus:outline-none w-full"
-                      />
-                      <button
-                        type="button"
-                        onClick={toggleConfirmNewPasswordVisibility}
-                        className="absolute right-2 text-gray-600 hover:text-gray-800"
-                        aria-label={showConfirmNewPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showConfirmNewPassword ? <FaEyeSlash /> : <FaEye />}
-                      </button>
+                      {isSendingOtp ? (
+                        <>
+                          <FaSpinner className="animate-spin mr-2" />
+                          Sending OTP...
+                        </>
+                      ) : (
+                        <>
+                          <FaEnvelope className="text-xl mr-2" />
+                          Send OTP
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-4 text-center">
+                    Enter OTP
+                  </h2>
+                  <p className="text-gray-600 mb-4 text-center">
+                    Enter the OTP sent to your email to verify your identity.
+                  </p>
+                  <form onSubmit={handleVerifyOtp}>
+                    <div className="mb-4">
+                      <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="otp">
+                        OTP
+                      </label>
+                      <div className="flex items-center bg-gray-100 p-2 rounded">
+                        <FaEnvelope className="text-purple-500 mr-2" />
+                        <input
+                          type="text"
+                          name="otp"
+                          id="otp"
+                          value={otp}
+                          onChange={handleOtpChange}
+                          placeholder="Enter the OTP"
+                          required
+                          className="bg-gray-100 focus:outline-none w-full"
+                          maxLength={6}
+                        />
+                      </div>
+                      {otpError && (
+                        <p className="text-red-500 text-xs mt-1">{otpError}</p>
+                      )}
                     </div>
-                    {confirmNewPasswordError && (
-                      <p className="text-red-500 text-xs mt-1">{confirmNewPasswordError}</p>
-                    )}
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isVerifyingOtp}
-                    className={`w-full flex justify-center items-center bg-gradient-to-br from-pink-500 to-purple-600 text-white py-2 rounded-lg font-medium transition duration-300 shadow-lg ${
-                      isVerifyingOtp
-                        ? 'cursor-not-allowed opacity-50'
-                        : 'hover:bg-gradient-to-br hover:from-pink-600 hover:to-purple-700'
-                    }`}
-                  >
-                    {isVerifyingOtp ? (
-                      <>
-                        <FaSpinner className="animate-spin mr-2" />
-                        Resetting...
-                      </>
-                    ) : (
-                      <>
-                        <FaLock className="text-xl mr-2" />
-                        Reset Password
-                      </>
-                    )}
-                  </button>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+                    <button
+                      type="submit"
+                      disabled={isVerifyingOtp}
+                      className={`w-full flex justify-center items-center bg-gradient-to-br from-pink-500 to-purple-600 text-white py-2 rounded-lg font-medium transition duration-300 shadow-lg ${
+                        isVerifyingOtp
+                          ? 'cursor-not-allowed opacity-50'
+                          : 'hover:bg-gradient-to-br hover:from-pink-600 hover:to-purple-700'
+                      }`}
+                    >
+                      {isVerifyingOtp ? (
+                        <>
+                          <FaSpinner className="animate-spin mr-2" />
+                          Verifying...
+                        </>
+                      ) : (
+                        <>
+                          <FaEnvelope className="text-xl mr-2" />
+                          Verify OTP
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </>
+              )}
+
+              {step === 3 && (
+                <>
+                  <h2 className="text-2xl font-semibold text-gray-800 mb-4 text-center">
+                    Reset Password
+                  </h2>
+                  <p className="text-gray-600 mb-4 text-center">
+                    Enter your new password below.
+                  </p>
+                  <form onSubmit={handleResetPassword}>
+                    <div className="mb-4">
+                      <label
+                        className="block text-gray-700 text-sm font-bold mb-2"
+                        htmlFor="newPassword"
+                      >
+                        New Password
+                      </label>
+                      <div className="flex items-center bg-gray-100 p-2 rounded relative">
+                        <FaLock className="text-red-500 mr-2" />
+                        <input
+                          type={showNewPassword ? 'text' : 'password'}
+                          name="newPassword"
+                          id="newPassword"
+                          value={newPassword}
+                          onChange={handleNewPasswordChange}
+                          placeholder="Enter your new password"
+                          required
+                          className="bg-gray-100 focus:outline-none w-full"
+                        />
+                        <button
+                          type="button"
+                          onClick={toggleNewPasswordVisibility}
+                          className="absolute right-2 text-gray-600 hover:text-gray-800"
+                          aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showNewPassword ? <FaEyeSlash /> : <FaEye />}
+                        </button>
+                      </div>
+                      {newPasswordError && (
+                        <p className="text-red-500 text-xs mt-1">{newPasswordError}</p>
+                      )}
+                    </div>
+                    <div className="mb-4">
+                      <label
+                        className="block text-gray-700 text-sm font-bold mb-2"
+                        htmlFor="confirmNewPassword"
+                      >
+                        Confirm New Password
+                      </label>
+                      <div className="flex items-center bg-gray-100 p-2 rounded relative">
+                        <FaLock className="text-red-500 mr-2" />
+                        <input
+                          type={showConfirmNewPassword ? 'text' : 'password'}
+                          name="confirmNewPassword"
+                          id="confirmNewPassword"
+                          value={confirmNewPassword}
+                          onChange={handleConfirmNewPasswordChange}
+                          placeholder="Confirm your new password"
+                          required
+                          className="bg-gray-100 focus:outline-none w-full"
+                        />
+                        <button
+                          type="button"
+                          onClick={toggleConfirmNewPasswordVisibility}
+                          className="absolute right-2 text-gray-600 hover:text-gray-800"
+                          aria-label={showConfirmNewPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showConfirmNewPassword ? <FaEyeSlash /> : <FaEye />}
+                        </button>
+                      </div>
+                      {confirmNewPasswordError && (
+                        <p className="text-red-500 text-xs mt-1">{confirmNewPasswordError}</p>
+                      )}
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isVerifyingOtp}
+                      className={`w-full flex justify-center items-center bg-gradient-to-br from-pink-500 to-purple-600 text-white py-2 rounded-lg font-medium transition duration-300 shadow-lg ${
+                        isVerifyingOtp
+                          ? 'cursor-not-allowed opacity-50'
+                          : 'hover:bg-gradient-to-br hover:from-pink-600 hover:to-purple-700'
+                      }`}
+                    >
+                      {isVerifyingOtp ? (
+                        <>
+                          <FaSpinner className="animate-spin mr-2" />
+                          Resetting...
+                        </>
+                      ) : (
+                        <>
+                          <FaLock className="text-xl mr-2" />
+                          Reset Password
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
