@@ -40,12 +40,11 @@ export const authOptions = {
             throw new Error('Invalid credentials');
           }
 
-          // Return the user object with encrypted data
+          // Return the user object with role
           return {
             id: userDoc.id,
             username: userData.username,
-            doctorName: userData.doctorName, // Encrypted
-            clinicName: userData.clinicName, // Encrypted
+            role: userData.role, // Ensure this field exists and is correctly set ('doctor' or 'patient')
           };
         } catch (error) {
           console.error('Login Error:', error);
@@ -55,11 +54,11 @@ export const authOptions = {
     }),
   ],
   pages: {
-    signIn: '/login',
+    signIn: '/login', // Adjust as needed
   },
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // Optional: Set session max age
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -67,8 +66,7 @@ export const authOptions = {
       if (user) {
         token.id = user.id;
         token.username = user.username;
-        token.doctorName = user.doctorName;
-        token.clinicName = user.clinicName;
+        token.role = user.role; // Include role in JWT
       }
       return token;
     },
@@ -77,8 +75,7 @@ export const authOptions = {
       if (token) {
         session.user.id = token.id;
         session.user.username = token.username;
-        session.user.doctorName = token.doctorName;
-        session.user.clinicName = token.clinicName;
+        session.user.role = token.role; // Include role in session
       }
       return session;
     },

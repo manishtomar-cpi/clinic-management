@@ -56,14 +56,8 @@ export default async function handler(req, res) {
         return res.status(409).json({ message: 'Username is already taken' });
       }
 
-      // Removed email uniqueness check to allow multiple users with the same email
-      // const qEmail = query(usersRef, where('email', '==', email));
-      // const querySnapshotEmail = await getDocs(qEmail);
-      //
-      // if (!querySnapshotEmail.empty) {
-      //   // Email already exists
-      //   return res.status(409).json({ message: 'Email is already registered' });
-      // }
+      // **Removed Email Uniqueness Check**
+      // Since doctors can have multiple accounts with the same email, we no longer check for email uniqueness.
 
       // Hash the password before storing
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -79,8 +73,9 @@ export default async function handler(req, res) {
         doctorName: encryptedDoctorName,
         clinicName: encryptedClinicName,
         clinicLocation: encryptedClinicLocation,
-        email, // Store email as plain text for communication
+        email, // Store email as plain text for communication (can be duplicated)
         password: hashedPassword, // Store hashed password
+        role: 'doctor', // Assign role
         createdAt: new Date().toISOString(),
       });
 

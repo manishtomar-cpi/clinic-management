@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   FaUserPlus,
@@ -36,7 +35,6 @@ const Sidebar = ({ onMenuItemClick, activeItem }) => {
       component: 'AppointmentsToday',
       icon: <FiCalendar className="text-green-500" />,
     },
- 
     {
       name: 'Missed Appointments',
       component: 'MissedAppointments',

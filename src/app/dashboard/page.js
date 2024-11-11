@@ -1,7 +1,8 @@
+// src/app/dashboard/page.js
 
 'use client';
 
-import { useSession, signOut } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react'; // Ensure signOut is imported
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { showToast } from '../../app/components/Toast';
@@ -27,6 +28,7 @@ import { db } from '../../db';
 import { collection, onSnapshot } from 'firebase/firestore';
 import StatsChart from '../components/StatsChart';
 import TotalPatient from '../components/TotalPatient';
+import ProtectedRoute from '../components/ProtectedRoute'; // Import the HOC
 
 // Spinner Component
 const MedicalSpinner = () => {
@@ -37,7 +39,7 @@ const MedicalSpinner = () => {
   );
 };
 
-const DashboardPage = () => {
+const DashboardContent = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [activeContent, setActiveContent] = useState('Dashboard');
@@ -139,7 +141,6 @@ const DashboardPage = () => {
     let ongoingTreatments = 0;
     let outstandingBalance = 0;
     let appointmentsToday = 0;
-    // Removed appointmentsThisWeek since the tile is being replaced
     let missedAppointmentsToday = 0;
 
     const now = new Date();
@@ -147,13 +148,6 @@ const DashboardPage = () => {
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date(now);
     todayEnd.setHours(23, 59, 59, 999);
-
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay()); // Start of the current week (Sunday)
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6); // End of the current week (Saturday)
-    endOfWeek.setHours(23, 59, 59, 999);
 
     allVisits.forEach((visit) => {
       let treatmentStatus = '';
@@ -202,8 +196,6 @@ const DashboardPage = () => {
         ) {
           missedAppointmentsToday += 1;
         }
-
-        // Optionally, handle appointmentsThisWeek if needed in the future
       }
     });
 
@@ -232,7 +224,6 @@ const DashboardPage = () => {
         description: 'Scheduled appointments for today',
         component: 'AppointmentsToday',
       },
-      // Removed "Appointments This Week" tile
       {
         title: 'Missed Appointments Today',
         count: missedAppointmentsToday,
@@ -261,14 +252,14 @@ const DashboardPage = () => {
   }
 
   const handleLogout = async () => {
-    showToast('You have successfully logged out!', 'success');
-    await signOut(router.push('/'));
-    
-  };
-  
-
-  const handleTileClick = (component) => {
-    setActiveContent(component);
+    try {
+      await signOut({ callbackUrl: '/' });
+      // Optionally, you can show a toast after signOut
+      showToast('You have successfully logged out!', 'success');
+    } catch (error) {
+      console.error('Logout Error:', error);
+      showToast('Error logging out. Please try again.', 'error');
+    }
   };
 
   const handleMenuItemClick = (component) => {
@@ -342,6 +333,14 @@ const DashboardPage = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+const DashboardPage = () => {
+  return (
+    <ProtectedRoute requiredRole="doctor">
+      <DashboardContent />
+    </ProtectedRoute>
   );
 };
 
