@@ -1,3 +1,5 @@
+// src/pages/api/auth/[...nextauth].js
+
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { db } from '../../../src/db'; 
@@ -45,36 +47,55 @@ export const authOptions = {
             throw new Error('Invalid credentials');
           }
 
-          // If user is a patient, fetch the associated doctor's name and doctorId
-          let doctorName = '';
+          // Initialize variables to store decrypted data
+          let decryptedName = '';
+          let decryptedEmail = '';
+          let decryptedDoctorName = '';
+          let decryptedClinicName = '';
+          let decryptedClinicLocation = '';
           let doctorId = '';
 
-          if (userData.role === 'patient') {
-            doctorId = userData.doctorId;
+          // Decrypt user's own data
+          decryptedName = decryptData(userData.name || '');
+          decryptedEmail = decryptData(userData.email || '');
+
+          if (userData.role === 'doctor') {
+            // If user is a doctor, decrypt their clinic details
+            decryptedDoctorName = decryptData(userData.doctorName || '');
+            decryptedClinicName = decryptData(userData.clinicName || '');
+            decryptedClinicLocation = decryptData(userData.clinicLocation || '');
+          } else if (userData.role === 'patient') {
+            // If user is a patient, fetch and decrypt their doctor's name
+            doctorId = userData.doctorId || '';
             if (doctorId) {
               const doctorDocRef = doc(db, 'users', doctorId);
-              const doctorDoc = await getDocs(query(collection(db, 'users'), where('id', '==', doctorId)));
+              const doctorDocSnapshot = await getDocs(
+                query(collection(db, 'users'), where('__name__', '==', doctorId))
+              );
 
-              if (!doctorDoc.empty) {
-                const doctorData = doctorDoc.docs[0].data();
-                doctorName = decryptData(doctorData.doctorName);
+              if (!doctorDocSnapshot.empty) {
+                const doctorDoc = doctorDocSnapshot.docs[0];
+                const doctorData = doctorDoc.data();
+                decryptedDoctorName = decryptData(doctorData.doctorName || '');
               }
             }
           }
 
-          // Return the user object with role, doctorName, doctorId
+          // Return the user object with decrypted fields
           return {
             id: userDoc.id,
-            name: decryptData(userData.name),
-            email: decryptData(userData.email),
+            name: decryptedName,
+            email: decryptedEmail,
             username: userData.username,
             role: userData.role,
-            doctorName: doctorName, // For patients
-            doctorId: doctorId, // For patients
+            doctorName: decryptedDoctorName, // For patients and doctors
+            clinicName: decryptedClinicName, // Only for doctors
+            clinicLocation: decryptedClinicLocation, // Only for doctors
+            doctorId: doctorId, // Only for patients
           };
         } catch (error) {
           console.error('Login Error:', error);
-          return null;
+          throw new Error(error.message || 'Authentication failed');
         }
       },
     }),
@@ -94,8 +115,10 @@ export const authOptions = {
         token.email = user.email;
         token.username = user.username;
         token.role = user.role;
-        token.doctorName = user.doctorName;
-        token.doctorId = user.doctorId;
+        token.doctorName = user.doctorName || '';
+        token.clinicName = user.clinicName || '';
+        token.clinicLocation = user.clinicLocation || '';
+        token.doctorId = user.doctorId || '';
       }
       return token;
     },
@@ -107,6 +130,8 @@ export const authOptions = {
         session.user.username = token.username;
         session.user.role = token.role;
         session.user.doctorName = token.doctorName;
+        session.user.clinicName = token.clinicName;
+        session.user.clinicLocation = token.clinicLocation;
         session.user.doctorId = token.doctorId;
       }
       return session;

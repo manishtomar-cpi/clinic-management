@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useSession, signOut } from 'next-auth/react'; // Ensure signOut is imported
+import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef } from 'react';
 import { showToast } from '../../app/components/Toast';
@@ -14,7 +14,7 @@ import {
   FiUsers,
   FiClipboard,
 } from 'react-icons/fi';
-import { FaCalendarCheck, FaRupeeSign, FaHeartbeat } from 'react-icons/fa';
+import { FaRupeeSign, FaHeartbeat } from 'react-icons/fa';
 import AddPatient from '../components/AddPatient';
 import SearchPatient from '../components/SearchPatient';
 import UpdateProfile from '../components/UpdateProfile';
@@ -28,9 +28,8 @@ import { db } from '../../db';
 import { collection, onSnapshot } from 'firebase/firestore';
 import StatsChart from '../components/StatsChart';
 import TotalPatient from '../components/TotalPatient';
-import ProtectedRoute from '../components/ProtectedRoute'; // Import the HOC
+import ProtectedRoute from '../components/ProtectedRoute';
 
-// Spinner Component
 const MedicalSpinner = () => {
   return (
     <div className="flex justify-center items-center h-screen">
@@ -56,9 +55,8 @@ const DashboardContent = () => {
       router.push('/login');
     } else if (status === 'authenticated' && session) {
       try {
-        // Decrypt the encrypted data from the session
-        const decryptedDoctorName = decryptData(session.user?.doctorName);
-        const decryptedClinicName = decryptData(session.user?.clinicName);
+        const decryptedDoctorName = session.user.doctorName || '';
+        const decryptedClinicName = session.user.clinicName || '';
         setDoctorName(decryptedDoctorName);
         setClinicName(decryptedClinicName);
 
@@ -67,8 +65,8 @@ const DashboardContent = () => {
           if (unsubscribe) unsubscribe();
         };
       } catch (error) {
-        console.error('Decryption Error:', error);
-        showToast('Error decrypting user data. Please contact support.', 'error');
+        console.error('Error retrieving session data:', error);
+        showToast('Error retrieving session data. Please contact support.', 'error');
       }
     }
   }, [status, session, router]);
@@ -85,8 +83,13 @@ const DashboardContent = () => {
 
         // Calculate ongoing treatments
         const ongoing = patientsSnapshot.docs.filter((doc) => {
-          const treatmentStatus = decryptData(doc.data().treatmentStatus || '');
-          return treatmentStatus === 'Ongoing';
+          try {
+            const treatmentStatus = doc.data().treatmentStatus || '';
+            return treatmentStatus === 'Ongoing';
+          } catch (error) {
+            console.error('Error accessing treatmentStatus:', error);
+            return false;
+          }
         }).length;
         setOngoingTreatments(ongoing);
 
@@ -157,41 +160,31 @@ const DashboardContent = () => {
     todayEnd.setHours(23, 59, 59, 999);
 
     allVisits.forEach((visit) => {
-      let treatmentStatus = '';
+      let visitStatus = '';
       let totalAmount = 0;
       let amountPaid = 0;
-      let nextVisitDateStr = '';
-      let nextVisitTimeStr = '';
       let visitDateStr = '';
       let visitTimeStr = '';
 
       try {
-        treatmentStatus = decryptData(visit.treatmentStatus || '');
-        totalAmount = parseFloat(decryptData(visit.totalAmount) || '0');
-        amountPaid = parseFloat(decryptData(visit.amountPaid) || '0');
-        nextVisitDateStr = decryptData(visit.nextVisitDate);
-        nextVisitTimeStr = decryptData(visit.nextVisitTime);
-        visitDateStr = decryptData(visit.visitDate);
-        visitTimeStr = decryptData(visit.visitTime);
+        visitStatus = visit.visitStatus || ''; // Get the visit status
+        totalAmount = parseFloat(visit.totalAmount) || 0;
+        amountPaid = parseFloat(visit.amountPaid) || 0;
+        visitDateStr = visit.visitDate || '';
+        visitTimeStr = visit.visitTime || '';
       } catch (error) {
-        console.error('Decryption Error for visit:', visit.id, error);
-        // Optionally, show a toast or handle the error as needed
-        return; // Skip this visit if decryption fails
+        console.error('Error accessing visit data:', visit.id, error);
+        return; // Skip this visit if data is inaccessible
       }
-
-      // Remove treatmentStatus counting from visits
-      // if (treatmentStatus === 'Ongoing') {
-      //   ongoingTreatments += 1;
-      // }
 
       outstandingBalance += totalAmount - amountPaid;
 
-      if (visitDateStr) {
+      if (visitDateStr && visitTimeStr) {
         const [day, month, year] = visitDateStr.split('-').map(Number);
         const [hours, minutes] = visitTimeStr.split(':').map(Number);
         const visitDateTime = new Date(year, month - 1, day, hours, minutes);
 
-        // Check if the visit is today for appointmentsToday count
+        // Check if the visit is scheduled for today
         if (visitDateTime >= todayStart && visitDateTime <= todayEnd) {
           appointmentsToday += 1;
         }
@@ -199,8 +192,8 @@ const DashboardContent = () => {
         // Check if the visit is missed today
         if (
           visitDateTime >= todayStart &&
-          visitDateTime < now &&
-          treatmentStatus !== 'Completed'
+          visitDateTime <= todayEnd &&
+          visitStatus === 'Missed'
         ) {
           missedAppointmentsToday += 1;
         }
@@ -211,14 +204,14 @@ const DashboardContent = () => {
       {
         title: 'Total Patients',
         count: totalPatients,
-        icon: <FiUsers className="text-purple-500" />, // Updated icon color to purple
-        color: 'border-purple-500', // Updated border color to purple
+        icon: <FiUsers className="text-purple-500" />,
+        color: 'border-purple-500',
         description: 'Number of registered patients',
-        component: 'TotalPatient', // Updated component to TotalPatient
+        component: 'TotalPatient',
       },
       {
         title: 'Ongoing Treatments',
-        count: ongoingTreatments, // Use the updated state
+        count: ongoingTreatments,
         icon: <FiClipboard className="text-green-500" />,
         color: 'border-green-500',
         description: 'Patients currently under treatment',
@@ -262,7 +255,6 @@ const DashboardContent = () => {
   const handleLogout = async () => {
     try {
       await signOut({ callbackUrl: '/' });
-      // Optionally, you can show a toast after signOut
       showToast('You have successfully logged out!', 'success');
     } catch (error) {
       console.error('Logout Error:', error);
@@ -306,8 +298,12 @@ const DashboardContent = () => {
           <>
             {/* Welcome Banner */}
             <div className="bg-gradient-to-r from-green-400 to-blue-500 text-white p-6 rounded-lg shadow-md mb-6 w-full sm:w-11/12 md:w-10/12 lg:w-full mt-10 lg:mt-0">
-              <h2 className="text-3xl font-bold mb-2">Welcome back, Dr. {doctorName}!</h2>
-              <p className="text-lg">Hope you have a productive day at {clinicName}.</p>
+              <h2 className="text-3xl font-bold mb-2">
+                Welcome back, Dr. {doctorName}!
+              </h2>
+              <p className="text-lg">
+                Hope you have a productive day at {clinicName}.
+              </p>
             </div>
 
             {/* Stats Tiles */}
@@ -320,7 +316,7 @@ const DashboardContent = () => {
                   icon={tile.icon}
                   color={tile.color}
                   description={tile.description}
-                  onClick={() => handleMenuItemClick(tile.component)} // Updated here
+                  onClick={() => handleMenuItemClick(tile.component)}
                 />
               ))}
             </div>
