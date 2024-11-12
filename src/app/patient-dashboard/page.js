@@ -74,36 +74,6 @@ const customStyles = {
   },
 };
 
-// Dark Mode Toggle Component
-const DarkModeToggle = ({ isDarkMode, toggleDarkMode }) => (
-  <div className="flex items-center justify-end p-4">
-    <FiSun
-      className={`mr-2 transition-transform duration-300 ${
-        isDarkMode ? 'transform rotate-0' : 'transform rotate-180'
-      }`}
-    />
-    <Switch
-      checked={isDarkMode}
-      onChange={toggleDarkMode}
-      className={`${
-        isDarkMode ? 'bg-indigo-600' : 'bg-gray-200'
-      } relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none`}
-      aria-label="Toggle Dark Mode"
-    >
-      <span
-        className={`${
-          isDarkMode ? 'translate-x-6' : 'translate-x-1'
-        } inline-block w-4 h-4 transform bg-white rounded-full transition-transform`}
-      />
-    </Switch>
-    <FiMoon
-      className={`ml-2 transition-transform duration-300 ${
-        isDarkMode ? 'transform rotate-180' : 'transform rotate-0'
-      }`}
-    />
-  </div>
-);
-
 // Status Badge Component
 const StatusBadge = ({ status }) => {
   if (!status) return null;
@@ -227,9 +197,21 @@ const Timeline = React.memo(({ visits, onViewDetails }) => {
   );
 });
 
+// Chat Component Placeholder
+const ChatComponent = () => {
+  return (
+    <div className="p-6">
+      <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Chat with Doctor</h2>
+      {/* Implement chat functionality here */}
+      <p>This is where the chat interface will be.</p>
+    </div>
+  );
+};
+
 const PatientDashboardContent = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [selectedMenuItem, setSelectedMenuItem] = useState('dashboard');
   const [patientData, setPatientData] = useState({
     name: '',
     age: '',
@@ -560,7 +542,10 @@ const PatientDashboardContent = () => {
   return (
     <div className="flex h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
       {/* Sidebar */}
-      <PatientSidebar />
+      <PatientSidebar
+        selectedMenuItem={selectedMenuItem}
+        onMenuItemClick={setSelectedMenuItem}
+      />
 
       {/* Main Content */}
       <motion.div
@@ -569,300 +554,309 @@ const PatientDashboardContent = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Dark Mode Toggle */}
-        {/* <DarkModeToggle isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} /> */}
-
-        <div className="p-6">
-          {/* Welcome Banner */}
-          <motion.div
-            className="bg-gradient-to-r from-green-400 to-blue-500 text-white p-6 rounded-lg shadow-md mb-6 w-full"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <h2 className="text-3xl font-bold mb-2">
-              Welcome, {patientData.name}!
-            </h2>
-            <p className="text-lg">
-              Managing your health has never been easier.
-            </p>
-            {doctorData.doctorName && (
-              <p className="mt-2">
-                Your assigned doctor:{' '}
-                <span className="font-semibold">{doctorData.doctorName}</span>
-              </p>
-            )}
-            {doctorData.clinicName && (
-              <p className="mt-1">
-                Clinic Name:{' '}
-                <span className="font-semibold">
-                  {doctorData.clinicName}
-                </span>
-              </p>
-            )}
-            {doctorData.clinicLocation && (
-              <p className="mt-1">
-                Clinic Location:{' '}
-                <span className="font-semibold">
-                  {doctorData.clinicLocation}
-                </span>
-              </p>
-            )}
-          </motion.div>
-
-          {/* Treatment Status Section */}
-<motion.div
-  className="mb-6"
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.5, delay: 0.3 }}
->
-  <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
-    Treatment Status
-  </h3>
-  {treatmentStatuses.length > 0 ? (
-    <div className="flex flex-wrap items-center gap-4">
-      {treatmentStatuses.map((status, index) => (
-        <div
-          key={index}
-          className="flex items-center gap-2 text-gray-800 dark:text-gray-200"
-        >
-          {/* Status Dot */}
-          <span
-            className={`w-3 h-3 rounded-full ${
-              status === "Completed"
-                ? "bg-yellow-500"
-                : status === "Ongoing"
-                ? "bg-green-500"
-                : status === "Hold"
-                ? "bg-red-500"
-                : "bg-gray-400"
+        {/* Dark Mode Toggle
+        <div className="flex items-center justify-end p-4">
+          <FiSun
+            className={`mr-2 transition-transform duration-300 ${
+              isDarkMode ? 'transform rotate-0' : 'transform rotate-180'
             }`}
-          ></span>
-          {/* Status Label */}
-          <span className="text-sm font-medium">{status}</span>
-        </div>
-      ))}
-    </div>
-  ) : (
-    <p className="text-gray-600 dark:text-gray-400">
-      No treatment statuses available.
-    </p>
-  )}
-</motion.div>
-
-
-       
-
-          {/* Patient Information Cards */}
-          <motion.div
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
+          />
+          <Switch
+            checked={isDarkMode}
+            onChange={toggleDarkMode}
+            className={`${
+              isDarkMode ? 'bg-indigo-600' : 'bg-gray-200'
+            } relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none`}
+            aria-label="Toggle Dark Mode"
           >
-            <InfoCard
-              label="Total Completed Visits"
-              value={totalCompletedVisits}
-              icon={<FiCheckCircle />}
-              gradient="from-purple-500 to-pink-500"
+            <span
+              className={`${
+                isDarkMode ? 'translate-x-6' : 'translate-x-1'
+              } inline-block w-4 h-4 transform bg-white rounded-full transition-transform`}
             />
-            <InfoCard
-              label="Name"
-              value={patientData.name}
-              icon={<FiUser />}
-              gradient="from-purple-500 to-pink-500"
-            />
-            <InfoCard
-              label="Age"
-              value={patientData.age}
-              icon={<FiUser />}
-              gradient="from-blue-500 to-green-500"
-            />
-            <InfoCard
-              label="Gender"
-              value={patientData.gender}
-              icon={<FiUser />}
-              gradient="from-red-500 to-yellow-500"
-            />
-            <InfoCard
-              label="Address"
-              value={patientData.address}
-              icon={<FiMap />}
-              gradient="from-teal-500 to-cyan-500"
-            />
-            <InfoCard
-              label="Mobile Number"
-              value={patientData.mobileNumber}
-              icon={<FiPhone />}
-              gradient="from-indigo-500 to-purple-500"
-            />
-            <InfoCard
-              label="Email"
-              value={patientData.email}
-              icon={<FiMail />}
-              gradient="from-orange-500 to-pink-500"
-            />
-            <InfoCard
-              label="Disease/Condition"
-              value={patientData.disease}
-              icon={<FaFileMedical />}
-              gradient="from-green-500 to-lime-500"
-            />
-            <InfoCard
-              label="Notes"
-              value={patientData.notes}
-              icon={<FaStickyNote />}
-              gradient="from-pink-500 to-red-500"
-            />
-          </motion.div>
+          </Switch>
+          <FiMoon
+            className={`ml-2 transition-transform duration-300 ${
+              isDarkMode ? 'transform rotate-180' : 'transform rotate-0'
+            }`}
+          />
+        </div> */}
 
-          {/* Pending Appointments */}
-          <motion.div
-            className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6 w-full"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-          >
-            <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
-              Pending Appointments
-            </h3>
-            {pendingAppointments && pendingAppointments.length > 0 ? (
-              pendingAppointments.map((appointment) => (
-                <motion.div
-                  key={appointment.id}
-                  className="flex items-center text-gray-600 dark:text-gray-300 mb-4 p-4 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700"
-                  initial={{ opacity: 0, x: -50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.2 }}
-                >
-                  <StatusBadge status={appointment.visitStatus} />
-                  <p className="ml-4">
-                    {getAppointmentMessage(appointment)}
-                    {appointment.visitStatus.toLowerCase() ===
-                      'rescheduled but missed' && (
-                      <span className="ml-2 text-sm text-red-600 dark:text-red-400">
-                        (Missed {appointment.missedCount} times)
-                      </span>
-                    )}
-                  </p>
-                </motion.div>
-              ))
-            ) : (
-              <div className="flex items-center text-gray-600 dark:text-gray-400">
-                <FiClock className="text-2xl mr-2 animate-pulse" />
-                <p>You have no pending appointments.</p>
-              </div>
-            )}
-          </motion.div>
+        {/* Conditional Rendering Based on Selected Menu Item */}
+        {selectedMenuItem === 'dashboard' && (
+          <div className="p-6">
+            {/* Welcome Banner */}
+            <motion.div
+              className="bg-gradient-to-r from-green-400 to-blue-500 text-white p-6 rounded-lg shadow-md mb-6 w-full"
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <h2 className="text-3xl font-bold mb-2">
+                Welcome, {patientData.name}!
+              </h2>
+              <p className="text-lg">
+                Managing your health has never been easier.
+              </p>
+              {doctorData.doctorName && (
+                <p className="mt-2">
+                  Your assigned doctor:{' '}
+                  <span className="font-semibold">{doctorData.doctorName}</span>
+                </p>
+              )}
+              {doctorData.clinicName && (
+                <p className="mt-1">
+                  Clinic Name:{' '}
+                  <span className="font-semibold">
+                    {doctorData.clinicName}
+                  </span>
+                </p>
+              )}
+              {doctorData.clinicLocation && (
+                <p className="mt-1">
+                  Clinic Location:{' '}
+                  <span className="font-semibold">
+                    {doctorData.clinicLocation}
+                  </span>
+                </p>
+              )}
+            </motion.div>
 
-          {/* Health Records Timeline */}
-          <motion.div
-            className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6 w-full"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.8 }}
-          >
-            <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Health Records</h3>
-            {visits.length > 0 ? (
-              <Timeline visits={visits} onViewDetails={openModal} />
-            ) : (
-              <div className="flex items-center text-gray-600 dark:text-gray-400">
-                <FaHeart className="text-2xl mr-2 animate-pulse" />
-                <p>Your health records will appear here once available.</p>
-              </div>
-            )}
-          </motion.div>
-        </div>
+            {/* Treatment Status Section */}
+            <motion.div
+              className="mb-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
+                Treatment Status
+              </h3>
+              {treatmentStatuses.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-4">
+                  {memoizedTreatmentStatusCards}
+                </div>
+              ) : (
+                <p className="text-gray-600 dark:text-gray-400">
+                  No treatment statuses available.
+                </p>
+              )}
+            </motion.div>
+
+            {/* Patient Information Cards */}
+            <motion.div
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.5 }}
+            >
+              <InfoCard
+                label="Total Completed Visits"
+                value={totalCompletedVisits}
+                icon={<FiCheckCircle />}
+                gradient="from-purple-500 to-pink-500"
+              />
+              <InfoCard
+                label="Name"
+                value={patientData.name}
+                icon={<FiUser />}
+                gradient="from-purple-500 to-pink-500"
+              />
+              <InfoCard
+                label="Age"
+                value={patientData.age}
+                icon={<FiUser />}
+                gradient="from-blue-500 to-green-500"
+              />
+              <InfoCard
+                label="Gender"
+                value={patientData.gender}
+                icon={<FiUser />}
+                gradient="from-red-500 to-yellow-500"
+              />
+              <InfoCard
+                label="Address"
+                value={patientData.address}
+                icon={<FiMap />}
+                gradient="from-teal-500 to-cyan-500"
+              />
+              <InfoCard
+                label="Mobile Number"
+                value={patientData.mobileNumber}
+                icon={<FiPhone />}
+                gradient="from-indigo-500 to-purple-500"
+              />
+              <InfoCard
+                label="Email"
+                value={patientData.email}
+                icon={<FiMail />}
+                gradient="from-orange-500 to-pink-500"
+              />
+              <InfoCard
+                label="Disease/Condition"
+                value={patientData.disease}
+                icon={<FaFileMedical />}
+                gradient="from-green-500 to-lime-500"
+              />
+              <InfoCard
+                label="Notes"
+                value={patientData.notes}
+                icon={<FaStickyNote />}
+                gradient="from-pink-500 to-red-500"
+              />
+            </motion.div>
+
+            {/* Pending Appointments */}
+            <motion.div
+              className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6 w-full"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+            >
+              <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
+                Pending Appointments
+              </h3>
+              {pendingAppointments && pendingAppointments.length > 0 ? (
+                pendingAppointments.map((appointment) => (
+                  <motion.div
+                    key={appointment.id}
+                    className="flex items-center text-gray-600 dark:text-gray-300 mb-4 p-4 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700"
+                    initial={{ opacity: 0, x: -50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3, delay: 0.2 }}
+                  >
+                    <StatusBadge status={appointment.visitStatus} />
+                    <p className="ml-4">
+                      {getAppointmentMessage(appointment)}
+                      {appointment.visitStatus.toLowerCase() ===
+                        'rescheduled but missed' && (
+                        <span className="ml-2 text-sm text-red-600 dark:text-red-400">
+                          (Missed {appointment.missedCount} times)
+                        </span>
+                      )}
+                    </p>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="flex items-center text-gray-600 dark:text-gray-400">
+                  <FiClock className="text-2xl mr-2 animate-pulse" />
+                  <p>You have no pending appointments.</p>
+                </div>
+              )}
+            </motion.div>
+
+            {/* Health Records Timeline */}
+            <motion.div
+              className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6 w-full"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.8 }}
+            >
+              <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Health Records</h3>
+              {visits.length > 0 ? (
+                <Timeline visits={visits} onViewDetails={openModal} />
+              ) : (
+                <div className="flex items-center text-gray-600 dark:text-gray-400">
+                  <FaHeart className="text-2xl mr-2 animate-pulse" />
+                  <p>Your health records will appear here once available.</p>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+
+        {selectedMenuItem === 'chat' && <ChatComponent />}
       </motion.div>
 
       {/* Modal for Visit Details */}
-      <Modal
-        isOpen={modalIsOpen}
-        onRequestClose={closeModal}
-        style={customStyles}
-        contentLabel="Visit Details"
-      >
-        {selectedVisit && (
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                Visit Details
-              </h2>
-              <button
-                onClick={closeModal}
-                className="text-white bg-red-500 hover:bg-red-600 dark:bg-red-700 dark:hover:bg-red-800 rounded-full w-8 h-8 flex items-center justify-center focus:outline-none"
-                aria-label="Close modal"
-              >
-                &times;
-              </button>
-            </div>
-            <div className="space-y-4">
-              <p className="flex items-center">
-                <FiCalendar className="mr-2 text-blue-500 dark:text-blue-300" />
-                <strong>Date:</strong> {formatDateToDDMMYYYY(selectedVisit.visitDate)}
-              </p>
-              <p className="flex items-center">
-                <FiClock className="mr-2 text-blue-500 dark:text-blue-300" />
-                <strong>Time:</strong> {selectedVisit.visitTime}
-              </p>
-              <p>
-                <strong>Visit Number:</strong> {selectedVisit.visitNumber}
-              </p>
-              <p className="flex items-center">
-                <StatusBadge status={selectedVisit.visitStatus} />
-                <strong className="ml-2">Visit Status:</strong>{' '}
-                {selectedVisit.visitStatus}
-              </p>
-              <p className="flex items-center">
-                <StatusBadge status={selectedVisit.treatmentStatus} />
-                <strong className="ml-2">Treatment Status:</strong>{' '}
-                {selectedVisit.treatmentStatus}
-              </p>
-              {selectedVisit.rescheduledStatus && (
+      {selectedMenuItem === 'dashboard' && (
+        <Modal
+          isOpen={modalIsOpen}
+          onRequestClose={closeModal}
+          style={customStyles}
+          contentLabel="Visit Details"
+        >
+          {selectedVisit && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                  Visit Details
+                </h2>
+                <button
+                  onClick={closeModal}
+                  className="text-white bg-red-500 hover:bg-red-600 dark:bg-red-700 dark:hover:bg-red-800 rounded-full w-8 h-8 flex items-center justify-center focus:outline-none"
+                  aria-label="Close modal"
+                >
+                  &times;
+                </button>
+              </div>
+              <div className="space-y-4">
                 <p className="flex items-center">
-                  <strong>Rescheduled Status:</strong>{' '}
-                  {selectedVisit.rescheduledStatus}
+                  <FiCalendar className="mr-2 text-blue-500 dark:text-blue-300" />
+                  <strong>Date:</strong> {formatDateToDDMMYYYY(selectedVisit.visitDate)}
                 </p>
-              )}
-              <p>
-                <strong>Reason for Visit:</strong> {selectedVisit.visitReason}
-              </p>
-              <p>
-                <strong>Symptoms:</strong> {selectedVisit.symptoms}
-              </p>
-              <p>
-                <strong>Medicines Prescribed:</strong>
-              </p>
-              <ul className="list-disc list-inside">
-                {selectedVisit.medicines.map((med, index) => (
-                  <li key={index}>
-                    {med.name} -{' '}
-                    {[
-                      med.timings.morning && 'Morning',
-                      med.timings.afternoon && 'Afternoon',
-                      med.timings.night && 'Night',
-                    ]
-                      .filter(Boolean)
-                      .join(', ')}
-                  </li>
-                ))}
-              </ul>
-              <p>
-                <strong>Total Amount:</strong> ₹{selectedVisit.totalAmount}
-              </p>
-              <p>
-                <strong>Amount Paid:</strong> ₹{selectedVisit.amountPaid}
-              </p>
-              {selectedVisit.notes && (
+                <p className="flex items-center">
+                  <FiClock className="mr-2 text-blue-500 dark:text-blue-300" />
+                  <strong>Time:</strong> {selectedVisit.visitTime}
+                </p>
                 <p>
-                  <strong>Notes:</strong> {selectedVisit.notes}
+                  <strong>Visit Number:</strong> {selectedVisit.visitNumber}
                 </p>
-              )}
+                <p className="flex items-center">
+                  <StatusBadge status={selectedVisit.visitStatus} />
+                  <strong className="ml-2">Visit Status:</strong>{' '}
+                  {selectedVisit.visitStatus}
+                </p>
+                <p className="flex items-center">
+                  <StatusBadge status={selectedVisit.treatmentStatus} />
+                  <strong className="ml-2">Treatment Status:</strong>{' '}
+                  {selectedVisit.treatmentStatus}
+                </p>
+                {selectedVisit.rescheduledStatus && (
+                  <p className="flex items-center">
+                    <strong>Rescheduled Status:</strong>{' '}
+                    {selectedVisit.rescheduledStatus}
+                  </p>
+                )}
+                <p>
+                  <strong>Reason for Visit:</strong> {selectedVisit.visitReason}
+                </p>
+                <p>
+                  <strong>Symptoms:</strong> {selectedVisit.symptoms}
+                </p>
+                <p>
+                  <strong>Medicines Prescribed:</strong>
+                </p>
+                <ul className="list-disc list-inside">
+                  {selectedVisit.medicines.map((med, index) => (
+                    <li key={index}>
+                      {med.name} -{' '}
+                      {[
+                        med.timings.morning && 'Morning',
+                        med.timings.afternoon && 'Afternoon',
+                        med.timings.night && 'Night',
+                      ]
+                        .filter(Boolean)
+                        .join(', ')}
+                    </li>
+                  ))}
+                </ul>
+                <p>
+                  <strong>Total Amount:</strong> ₹{selectedVisit.totalAmount}
+                </p>
+                <p>
+                  <strong>Amount Paid:</strong> ₹{selectedVisit.amountPaid}
+                </p>
+                {selectedVisit.notes && (
+                  <p>
+                    <strong>Notes:</strong> {selectedVisit.notes}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </Modal>
+          )}
+        </Modal>
+      )}
     </div>
   );
 };
