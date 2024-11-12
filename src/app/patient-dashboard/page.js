@@ -1,16 +1,15 @@
-// File: src/app/patient-dashboard/page.jsx
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { showToast } from "../components/Toast"; // Ensure correct path
-import PatientSidebar from "../components/PatientSidebar"; // Ensure correct path
-import ProtectedRoute from "../components/ProtectedRoute"; // Ensure correct path
-import MedicalSpinner from "../components/MedicalSpinner"; // Ensure correct path
+import { showToast } from "../components/Toast";
+import PatientSidebar from "../components/PatientSidebar";
+import ProtectedRoute from "../components/ProtectedRoute";
+import MedicalSpinner from "../components/MedicalSpinner";
+import PatientChatComponent from "../components/PatientChatComponent";
 import { decryptData } from "../../lib/encryption";
-import { db } from "../../db"; // Ensure correct path
+import { db } from "../../db";
 import {
   collection,
   doc,
@@ -26,7 +25,6 @@ import {
   FaCalendarAlt,
   FaFileMedical,
   FaStickyNote,
-  FaTimesCircle,
   FaStopCircle,
 } from "react-icons/fa";
 import {
@@ -38,11 +36,8 @@ import {
   FiPhone,
   FiMail,
   FiFilter,
-  FiArrowLeft,
-  FiMoon,
   FiSun,
 } from "react-icons/fi";
-import { Switch } from "@headlessui/react"; // For dark mode toggle
 
 // Formatting Function
 const formatDateToDDMMYYYY = (dateStr) => {
@@ -86,7 +81,7 @@ const StatusBadge = ({ status }) => {
     },
     missed: {
       color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
-      Icon: FaTimesCircle,
+      Icon: FaHeart,
     },
     upcoming: {
       color:
@@ -203,23 +198,12 @@ const Timeline = React.memo(({ visits, onViewDetails }) => {
   );
 });
 
-// Chat Component Placeholder
-const ChatComponent = () => {
-  return (
-    <div className="p-6">
-      <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
-        Chat with Doctor
-      </h2>
-      {/* Implement chat functionality here */}
-      <p>This is where the chat interface will be.</p>
-    </div>
-  );
-};
-
 const PatientDashboardContent = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [selectedMenuItem, setSelectedMenuItem] = useState("dashboard");
+  const [doctorId, setDoctorId] = useState(null);
+  const [patientId, setPatientId] = useState(null);
   const [patientData, setPatientData] = useState({
     name: "",
     age: "",
@@ -284,7 +268,8 @@ const PatientDashboardContent = () => {
 
         try {
           const userId = session.user.id; // Patient's user ID
-          let doctorId = null;
+          setPatientId(userId); // Set patientId in state
+          let fetchedDoctorId = null;
 
           // Fetch patient data from 'users' collection to get doctorId
           const patientUserDocRef = doc(db, "users", userId);
@@ -292,14 +277,16 @@ const PatientDashboardContent = () => {
 
           if (patientUserDoc.exists()) {
             const userData = patientUserDoc.data();
-            doctorId = userData.doctorId;
+            fetchedDoctorId = userData.doctorId;
 
-            if (doctorId) {
+            if (fetchedDoctorId) {
+              setDoctorId(fetchedDoctorId); // Set doctorId in state
+
               // Fetch patient data from 'doctors/{doctorId}/patients/{patientId}'
               const patientDocRef = doc(
                 db,
                 "doctors",
-                doctorId,
+                fetchedDoctorId,
                 "patients",
                 userId
               );
@@ -339,7 +326,7 @@ const PatientDashboardContent = () => {
               }
 
               // Fetch doctor's data from 'users' collection
-              const doctorDocRef = doc(db, "users", doctorId);
+              const doctorDocRef = doc(db, "users", fetchedDoctorId);
               const doctorDoc = await getDoc(doctorDocRef);
 
               if (doctorDoc.exists()) {
@@ -370,7 +357,7 @@ const PatientDashboardContent = () => {
               const visitsRef = collection(
                 db,
                 "doctors",
-                doctorId,
+                fetchedDoctorId,
                 "patients",
                 userId,
                 "visits"
@@ -474,15 +461,14 @@ const PatientDashboardContent = () => {
 
           setIsLoading(false);
         } catch (error) {
+          console.error(error);
           showToast(
             "Error fetching your data. Please contact support.",
             "error"
           );
           setIsLoading(false);
         }
-      } else if (status === "unauthenticated") {
-        router.push("/patient-login"); // Redirect to login if not authenticated
-      }
+      };
     };
 
     fetchPatientAndDoctorData();
@@ -502,9 +488,9 @@ const PatientDashboardContent = () => {
   // Function to get appointment message based on status
   const getAppointmentMessage = (appointment) => {
     const { visitStatus, visitDate, visitTime, missedCount } = appointment;
-    const dateMessage = `on ${formatDateToDDMMYYYY(appointment.visitDate)} at ${
-      appointment.visitTime
-    }`;
+    const dateMessage = `on ${formatDateToDDMMYYYY(
+      appointment.visitDate
+    )} at ${appointment.visitTime}`;
     switch (visitStatus.toLowerCase()) {
       case "upcoming":
         return `Your upcoming appointment is scheduled ${dateMessage}.`;
@@ -527,7 +513,7 @@ const PatientDashboardContent = () => {
         status={status}
         icon={
           status.toLowerCase() === "completed" ? (
-            <FaHeart />
+            <FiCheckCircle />
           ) : status.toLowerCase() === "ongoing" ? (
             <FiClock />
           ) : status.toLowerCase() === "stopped" ? (
@@ -561,34 +547,6 @@ const PatientDashboardContent = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Dark Mode Toggle */}
-        {/* <div className="flex items-center justify-end p-4">
-          <FiSun
-            className={`mr-2 transition-transform duration-300 ${
-              isDarkMode ? 'transform rotate-0' : 'transform rotate-180'
-            }`}
-          />
-          <Switch
-            checked={isDarkMode}
-            onChange={toggleDarkMode}
-            className={`${
-              isDarkMode ? 'bg-indigo-600' : 'bg-gray-200'
-            } relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none`}
-            aria-label="Toggle Dark Mode"
-          >
-            <span
-              className={`${
-                isDarkMode ? 'translate-x-6' : 'translate-x-1'
-              } inline-block w-4 h-4 transform bg-white rounded-full transition-transform`}
-            />
-          </Switch>
-          <FiMoon
-            className={`ml-2 transition-transform duration-300 ${
-              isDarkMode ? 'transform rotate-180' : 'transform rotate-0'
-            }`}
-          />
-        </div> */}
-
         {/* Conditional Rendering Based on Selected Menu Item */}
         {selectedMenuItem === "dashboard" && (
           <div className="p-6">
@@ -602,9 +560,7 @@ const PatientDashboardContent = () => {
               <h2 className="text-3xl font-bold mb-2">
                 Welcome, {patientData.name}!
               </h2>
-              <p className="text-lg">
-                Managing your health has never been easier.
-              </p>
+              <p className="text-lg">Managing your health has never been easier.</p>
               {doctorData.doctorName && (
                 <p className="mt-2">
                   Your assigned doctor:{" "}
@@ -620,9 +576,7 @@ const PatientDashboardContent = () => {
               {doctorData.clinicLocation && (
                 <p className="mt-1">
                   Clinic Location:{" "}
-                  <span className="font-semibold">
-                    {doctorData.clinicLocation}
-                  </span>
+                  <span className="font-semibold">{doctorData.clinicLocation}</span>
                 </p>
               )}
             </motion.div>
@@ -710,6 +664,7 @@ const PatientDashboardContent = () => {
                 gradient="from-pink-500 to-red-500"
               />
             </motion.div>
+
             {/* Pending Appointments */}
             <motion.div
               className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6 w-full"
@@ -771,7 +726,10 @@ const PatientDashboardContent = () => {
           </div>
         )}
 
-        {selectedMenuItem === "chat" && <ChatComponent />}
+        {/* Chat Component */}
+        {selectedMenuItem === "chat" && (
+          <PatientChatComponent />
+        )}
       </motion.div>
 
       {/* Modal for Visit Details */}
@@ -799,8 +757,7 @@ const PatientDashboardContent = () => {
               <div className="space-y-4">
                 <p className="flex items-center">
                   <FiCalendar className="mr-2 text-blue-500 dark:text-blue-300" />
-                  <strong>Date:</strong>{" "}
-                  {formatDateToDDMMYYYY(selectedVisit.visitDate)}
+                  <strong>Date:</strong> {formatDateToDDMMYYYY(selectedVisit.visitDate)}
                 </p>
                 <p className="flex items-center">
                   <FiClock className="mr-2 text-blue-500 dark:text-blue-300" />
@@ -811,18 +768,15 @@ const PatientDashboardContent = () => {
                 </p>
                 <p className="flex items-center">
                   <StatusBadge status={selectedVisit.visitStatus} />
-                  <strong className="ml-2">Visit Status:</strong>{" "}
-                  {selectedVisit.visitStatus}
+                  <strong className="ml-2">Visit Status:</strong> {selectedVisit.visitStatus}
                 </p>
                 <p className="flex items-center">
                   <StatusBadge status={selectedVisit.treatmentStatus} />
-                  <strong className="ml-2">Treatment Status:</strong>{" "}
-                  {selectedVisit.treatmentStatus}
+                  <strong className="ml-2">Treatment Status:</strong> {selectedVisit.treatmentStatus}
                 </p>
                 {selectedVisit.rescheduledStatus && (
                   <p className="flex items-center">
-                    <strong>Rescheduled Status:</strong>{" "}
-                    {selectedVisit.rescheduledStatus}
+                    <strong>Rescheduled Status:</strong> {selectedVisit.rescheduledStatus}
                   </p>
                 )}
                 <p>

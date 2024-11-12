@@ -1,34 +1,35 @@
-// src/app/dashboard/page.js
+"use client";
 
-'use client';
-
-import { useSession, signOut } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef } from 'react';
-import { showToast } from '../../app/components/Toast';
-import Sidebar from '../components/Sidebar';
-import Tile from '../components/Tile';
+import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, useRef, useMemo } from "react";
+import { showToast } from "../../app/components/Toast";
+import Sidebar from "../components/Sidebar";
+import Tile from "../components/Tile";
 import {
   FiCalendar,
   FiAlertCircle,
   FiUsers,
   FiClipboard,
-} from 'react-icons/fi';
-import { FaRupeeSign, FaHeartbeat } from 'react-icons/fa';
-import AddPatient from '../components/AddPatient';
-import SearchPatient from '../components/SearchPatient';
-import UpdateProfile from '../components/UpdateProfile';
-import PatientBalance from '../components/PatientBalance';
-import OngoingPatients from '../components/OngoingPatients';
-import AppointmentsToday from '../components/AppointmentsToday';
-import AddVisit from '../components/AddVisit';
-import MissedAppointments from '../components/MissedAppointments';
-import { decryptData } from '../../lib/encryption';
-import { db } from '../../db';
-import { collection, onSnapshot } from 'firebase/firestore';
-import StatsChart from '../components/StatsChart';
-import TotalPatient from '../components/TotalPatient';
-import ProtectedRoute from '../components/ProtectedRoute';
+} from "react-icons/fi";
+import { FaRupeeSign, FaHeartbeat } from "react-icons/fa";
+import AddPatient from "../components/AddPatient";
+import SearchPatient from "../components/SearchPatient";
+import UpdateProfile from "../components/UpdateProfile";
+import PatientBalance from "../components/PatientBalance";
+import OngoingPatients from "../components/OngoingPatients";
+import AppointmentsToday from "../components/AppointmentsToday";
+import AddVisit from "../components/AddVisit";
+import MissedAppointments from "../components/MissedAppointments";
+import { decryptData } from "../../lib/encryption";
+import { db } from "../../db";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
+import StatsChart from "../components/StatsChart";
+import TotalPatient from "../components/TotalPatient";
+import ProtectedRoute from "../components/ProtectedRoute";
+import ChatList from "../components/ChatList";
+import DoctorChatComponent from "../components/DoctorChatComponent";
+import { FaHome } from "react-icons/fa";
 
 const MedicalSpinner = () => {
   return (
@@ -41,22 +42,24 @@ const MedicalSpinner = () => {
 const DashboardContent = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeContent, setActiveContent] = useState('Dashboard');
-  const [doctorName, setDoctorName] = useState('');
-  const [clinicName, setClinicName] = useState('');
+  const [activeContent, setActiveContent] = useState("Dashboard");
+  const [doctorName, setDoctorName] = useState("");
+  const [clinicName, setClinicName] = useState("");
   const [tileData, setTileData] = useState([]);
   const [allVisits, setAllVisits] = useState([]); // Centralized state for all visits
   const visitsListenersRef = useRef([]); // To store visits listeners
   const [totalPatients, setTotalPatients] = useState(0); // Track total patients
   const [ongoingTreatments, setOngoingTreatments] = useState(0); // Track ongoing treatments
+  const [unreadCounts, setUnreadCounts] = useState({}); // To store unread counts per chat
+  const [selectedChat, setSelectedChat] = useState(null); // To track selected chat
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-    } else if (status === 'authenticated' && session) {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    } else if (status === "authenticated" && session) {
       try {
-        const decryptedDoctorName = session.user.doctorName || '';
-        const decryptedClinicName = session.user.clinicName || '';
+        const decryptedDoctorName = decryptData(session.user.doctorName) || "";
+        const decryptedClinicName = decryptData(session.user.clinicName) || "";
         setDoctorName(decryptedDoctorName);
         setClinicName(decryptedClinicName);
 
@@ -65,15 +68,18 @@ const DashboardContent = () => {
           if (unsubscribe) unsubscribe();
         };
       } catch (error) {
-        console.error('Error retrieving session data:', error);
-        showToast('Error retrieving session data. Please contact support.', 'error');
+        console.error("Error retrieving session data:", error);
+        showToast(
+          "Error retrieving session data. Please contact support.",
+          "error"
+        );
       }
     }
   }, [status, session, router]);
 
   const fetchDashboardData = () => {
     const doctorId = session.user.id;
-    const patientsRef = collection(db, 'doctors', doctorId, 'patients');
+    const patientsRef = collection(db, "doctors", doctorId, "patients");
 
     const unsubscribePatients = onSnapshot(
       patientsRef,
@@ -84,10 +90,10 @@ const DashboardContent = () => {
         // Calculate ongoing treatments
         const ongoing = patientsSnapshot.docs.filter((doc) => {
           try {
-            const treatmentStatus = doc.data().treatmentStatus || '';
-            return treatmentStatus === 'Ongoing';
+            const treatmentStatus = doc.data().treatmentStatus || "";
+            return treatmentStatus === "Ongoing";
           } catch (error) {
-            console.error('Error accessing treatmentStatus:', error);
+            console.error("Error accessing treatmentStatus:", error);
             return false;
           }
         }).length;
@@ -104,11 +110,11 @@ const DashboardContent = () => {
         patientIds.forEach((patientId) => {
           const visitsRef = collection(
             db,
-            'doctors',
+            "doctors",
             doctorId,
-            'patients',
+            "patients",
             patientId,
-            'visits'
+            "visits"
           );
 
           const unsubscribeVisit = onSnapshot(
@@ -130,8 +136,14 @@ const DashboardContent = () => {
               });
             },
             (error) => {
-              console.error(`Error fetching visits for patient ${patientId}:`, error);
-              showToast(`Error fetching visits for patient ${patientId}.`, 'error');
+              console.error(
+                `Error fetching visits for patient ${patientId}:`,
+                error
+              );
+              showToast(
+                `Error fetching visits for patient ${patientId}.`,
+                "error"
+              );
             }
           );
 
@@ -139,8 +151,8 @@ const DashboardContent = () => {
         });
       },
       (error) => {
-        console.error('Error fetching patients:', error);
-        showToast('Error fetching patients data. Please try again later.', 'error');
+        console.error("Error fetching patients:", error);
+        showToast("Error fetching patients data. Please try again later.", "error");
       }
     );
 
@@ -160,28 +172,28 @@ const DashboardContent = () => {
     todayEnd.setHours(23, 59, 59, 999);
 
     allVisits.forEach((visit) => {
-      let visitStatus = '';
+      let visitStatus = "";
       let totalAmount = 0;
       let amountPaid = 0;
-      let visitDateStr = '';
-      let visitTimeStr = '';
+      let visitDateStr = "";
+      let visitTimeStr = "";
 
       try {
-        visitStatus = visit.visitStatus || ''; // Get the visit status
+        visitStatus = visit.visitStatus || ""; // Get the visit status
         totalAmount = parseFloat(visit.totalAmount) || 0;
         amountPaid = parseFloat(visit.amountPaid) || 0;
-        visitDateStr = visit.visitDate || '';
-        visitTimeStr = visit.visitTime || '';
+        visitDateStr = visit.visitDate || "";
+        visitTimeStr = visit.visitTime || "";
       } catch (error) {
-        console.error('Error accessing visit data:', visit.id, error);
+        console.error("Error accessing visit data:", visit.id, error);
         return; // Skip this visit if data is inaccessible
       }
 
       outstandingBalance += totalAmount - amountPaid;
 
       if (visitDateStr && visitTimeStr) {
-        const [day, month, year] = visitDateStr.split('-').map(Number);
-        const [hours, minutes] = visitTimeStr.split(':').map(Number);
+        const [day, month, year] = visitDateStr.split("-").map(Number);
+        const [hours, minutes] = visitTimeStr.split(":").map(Number);
         const visitDateTime = new Date(year, month - 1, day, hours, minutes);
 
         // Check if the visit is scheduled for today
@@ -193,7 +205,7 @@ const DashboardContent = () => {
         if (
           visitDateTime >= todayStart &&
           visitDateTime <= todayEnd &&
-          visitStatus === 'Missed'
+          visitStatus === "Missed"
         ) {
           missedAppointmentsToday += 1;
         }
@@ -202,49 +214,76 @@ const DashboardContent = () => {
 
     setTileData([
       {
-        title: 'Total Patients',
+        title: "Total Patients",
         count: totalPatients,
         icon: <FiUsers className="text-purple-500" />,
-        color: 'border-purple-500',
-        description: 'Number of registered patients',
-        component: 'TotalPatient',
+        color: "border-purple-500",
+        description: "Number of registered patients",
+        component: "TotalPatient",
       },
       {
-        title: 'Ongoing Treatments',
+        title: "Ongoing Treatments",
         count: ongoingTreatments,
         icon: <FiClipboard className="text-green-500" />,
-        color: 'border-green-500',
-        description: 'Patients currently under treatment',
-        component: 'OngoingPatients',
+        color: "border-green-500",
+        description: "Patients currently under treatment",
+        component: "OngoingPatients",
       },
       {
-        title: 'Appointments Today',
+        title: "Appointments Today",
         count: appointmentsToday,
         icon: <FiCalendar className="text-purple-500" />,
-        color: 'border-purple-500',
-        description: 'Scheduled appointments for today',
-        component: 'AppointmentsToday',
+        color: "border-purple-500",
+        description: "Scheduled appointments for today",
+        component: "AppointmentsToday",
       },
       {
-        title: 'Missed Appointments Today',
+        title: "Missed Appointments Today",
         count: missedAppointmentsToday,
         icon: <FiAlertCircle className="text-red-500" />,
-        color: 'border-red-500',
-        description: 'Missed appointments for today',
-        component: 'MissedAppointments',
+        color: "border-red-500",
+        description: "Missed appointments for today",
+        component: "MissedAppointments",
       },
       {
-        title: 'Outstanding Balance (₹)',
+        title: "Outstanding Balance (₹)",
         count: outstandingBalance.toFixed(2),
         icon: <FaRupeeSign className="text-yellow-500" />,
-        color: 'border-yellow-500',
-        description: 'Total outstanding payments',
-        component: 'PatientBalance',
+        color: "border-yellow-500",
+        description: "Total outstanding payments",
+        component: "PatientBalance",
       },
     ]);
   }, [allVisits, totalPatients, ongoingTreatments]);
 
-  if (status === 'loading') {
+  // Fetch unread counts for the Messages badge
+  useEffect(() => {
+    const fetchUnreadCounts = () => {
+      const doctorId = session.user.id;
+      const chatsRef = collection(db, "chats");
+      const q = query(chatsRef, where("doctorId", "==", doctorId));
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const counts = {};
+        snapshot.docs.forEach((chatDoc) => {
+          const chatData = chatDoc.data();
+          counts[chatDoc.id] = chatData.unreadCount || 0;
+        });
+        setUnreadCounts(counts);
+      });
+
+      return () => unsubscribe();
+    };
+
+    fetchUnreadCounts();
+  }, [session.user.id]);
+
+  // Compute total unread messages
+  const totalUnread = useMemo(() => {
+    return Object.values(unreadCounts).reduce((a, b) => a + b, 0);
+  }, [unreadCounts]);
+
+  if (status === "loading") {
     return <MedicalSpinner />;
   }
 
@@ -254,45 +293,61 @@ const DashboardContent = () => {
 
   const handleLogout = async () => {
     try {
-      await signOut({ callbackUrl: '/' });
-      showToast('You have successfully logged out!', 'success');
+      await signOut({ callbackUrl: "/" });
+      showToast("You have successfully logged out!", "success");
     } catch (error) {
-      console.error('Logout Error:', error);
-      showToast('Error logging out. Please try again.', 'error');
+      console.error("Logout Error:", error);
+      showToast("Error logging out. Please try again.", "error");
     }
   };
 
   const handleMenuItemClick = (component) => {
-    if (component === 'Logout') {
+    if (component === "Logout") {
       handleLogout();
-    } else if (component === 'Home') {
-      router.push('/');
+    } else if (component === "Home") {
+      router.push("/");
     } else {
       setActiveContent(component);
+      setSelectedChat(null); // Reset selected chat when changing menu
     }
   };
 
   const renderContent = () => {
     switch (activeContent) {
-      case 'AddPatient':
+      case "AddPatient":
         return <AddPatient />;
-      case 'AddVisit':
+      case "AddVisit":
         return <AddVisit />;
-      case 'SearchPatient':
+      case "SearchPatient":
         return <SearchPatient />;
-      case 'UpdateProfile':
+      case "UpdateProfile":
         return <UpdateProfile />;
-      case 'PatientBalance':
+      case "PatientBalance":
         return <PatientBalance />;
-      case 'OngoingPatients':
+      case "OngoingPatients":
         return <OngoingPatients />;
-      case 'AppointmentsToday':
+      case "AppointmentsToday":
         return <AppointmentsToday />;
-      case 'TotalPatient':
+      case "TotalPatient":
         return <TotalPatient />;
-      case 'MissedAppointments':
-        return <MissedAppointments />;
-      case 'Dashboard':
+      case "Messages":
+        if (selectedChat) {
+          return (
+            <DoctorChatComponent
+              chatId={selectedChat.id}
+              otherUserId={selectedChat.patientId}
+              onBack={() => setSelectedChat(null)}
+            />
+          );
+        } else {
+          return (
+            <ChatList
+              doctorId={session.user.id}
+              onSelectChat={(chat) => setSelectedChat(chat)}
+            />
+          );
+        }
+      case "Dashboard":
       default:
         return (
           <>
@@ -330,7 +385,11 @@ const DashboardContent = () => {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar onMenuItemClick={handleMenuItemClick} activeItem={activeContent} />
+      <Sidebar
+        onMenuItemClick={handleMenuItemClick}
+        activeItem={activeContent}
+        unreadCount={totalUnread}
+      />
       <div className="flex-1 overflow-auto bg-gray-100">
         <div className="p-6">
           <div>{renderContent()}</div>
