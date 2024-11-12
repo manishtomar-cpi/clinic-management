@@ -304,9 +304,9 @@ const PatientChatComponent = () => {
       await batch.commit();
 
       showToast("Messages deleted.", "success");
+      setShowDeleteModal(false);
       setSelectMode(false);
       setSelectedMessages([]);
-      setShowDeleteModal(false);
     } catch (error) {
       console.error("Error deleting messages:", error);
       showToast("Error deleting messages.", "error");
@@ -398,7 +398,7 @@ const PatientChatComponent = () => {
                         </span>
                         {isOwnMessage && (
                           <span
-                            className={`text-xs flex items-center text-green-700`}
+                            className={`text-xs flex items-center text-green-700`} // Changed to dark green
                           >
                             {msg.read ? (
                               <>
@@ -475,7 +475,7 @@ const PatientChatComponent = () => {
         {showDeleteModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <motion.div
-              className="bg-white rounded-lg p-6 w-11/12 max-w-md shadow-lg"
+              className="bg-white rounded-lg p-6 w-full max-w-2xl shadow-lg" // Changed to w-full and max-w-2xl
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.3 }}
@@ -495,13 +495,17 @@ const PatientChatComponent = () => {
                       Cancel
                     </button>
                     <button
-                      onClick={() => confirmDeleteMessages(false)}
+                      onClick={() => {
+                        confirmDeleteMessages(false);
+                      }}
                       className="px-4 py-2 rounded bg-yellow-500 text-white hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-300"
                     >
                       Delete for me
                     </button>
                     <button
-                      onClick={() => confirmDeleteMessages(true)}
+                      onClick={() => {
+                        confirmDeleteMessages(true);
+                      }}
                       className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300"
                     >
                       Delete for everyone
@@ -521,7 +525,9 @@ const PatientChatComponent = () => {
                       Cancel
                     </button>
                     <button
-                      onClick={() => confirmDeleteMessages(false)}
+                      onClick={() => {
+                        confirmDeleteMessages(false);
+                      }}
                       className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300"
                     >
                       Delete for me
@@ -546,13 +552,17 @@ const PatientChatComponent = () => {
                       Cancel
                     </button>
                     <button
-                      onClick={() => confirmDeleteMessages(false)}
+                      onClick={() => {
+                        confirmDeleteMessages(false);
+                      }}
                       className="px-4 py-2 rounded bg-red-500 text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-300"
                     >
                       Delete for me
                     </button>
                     <button
-                      onClick={() => confirmDeleteMessages(true)}
+                      onClick={() => {
+                        confirmDeleteMessages(true);
+                      }}
                       className="px-4 py-2 rounded bg-yellow-500 text-white hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-300"
                     >
                       Delete for everyone

@@ -77,7 +77,7 @@ const Sidebar = ({ onMenuItemClick, activeItem, unreadCount }) => {
         <div className="relative">
           <FaEnvelopeOpenText className="text-blue-500" />
           {unreadCount > 0 && (
-            <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">
+            <span className="absolute -top-2 -right-2 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-500 rounded-full">
               {unreadCount}
             </span>
           )}
@@ -121,27 +121,30 @@ const Sidebar = ({ onMenuItemClick, activeItem, unreadCount }) => {
       <div
         className={`bg-white text-gray-800 w-64 space-y-2 py-7 px-2 absolute inset-y-0 left-0 transform ${
           isOpen ? "translate-x-0" : "-translate-x-full"
-        } md:relative md:translate-x-0 transition duration-200 ease-in-out shadow-lg z-50`}
+        } md:relative md:translate-x-0 transition duration-200 ease-in-out shadow-lg z-50 overflow-y-auto`}
         style={{ flexShrink: 0 }}
       >
         <nav className="flex flex-col h-full">
-          {menuItems.map((item, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                onMenuItemClick(item.component);
-                setIsOpen(false);
-              }}
-              className={`flex items-center w-full text-left py-2.5 px-4 rounded transition duration-200 hover:bg-gray-200 ${
-                activeItem === item.component
-                  ? "bg-gradient-to-r from-blue-500 to-teal-400 text-white"
-                  : ""
-              }`}
-            >
-              {item.icon}
-              <span className="ml-3">{item.name}</span>
-            </button>
-          ))}
+          {/* Menu Items */}
+          <div className="flex-1">
+            {menuItems.map((item, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  onMenuItemClick(item.component);
+                  setIsOpen(false);
+                }}
+                className={`flex items-center w-full text-left py-2.5 px-4 rounded transition duration-200 hover:bg-gray-200 ${
+                  activeItem === item.component
+                    ? "bg-gradient-to-r from-blue-500 to-teal-400 text-white"
+                    : ""
+                }`}
+              >
+                {item.icon}
+                <span className="ml-3">{item.name}</span>
+              </button>
+            ))}
+          </div>
 
           {/* Home and Logout Buttons */}
           <div className="mt-auto">
@@ -165,7 +168,11 @@ const Sidebar = ({ onMenuItemClick, activeItem, unreadCount }) => {
                 onMenuItemClick("Logout");
                 setIsOpen(false);
               }}
-              className="flex items-center w-full text-left py-2.5 px-4 rounded transition duration-200 hover:bg-gray-200 mt-2"
+              className={`flex items-center w-full text-left py-2.5 px-4 rounded transition duration-200 hover:bg-gray-200 mt-2 ${
+                activeItem === "Logout"
+                  ? "bg-gradient-to-r from-red-500 to-pink-500 text-white"
+                  : ""
+              }`}
             >
               <svg
                 className="h-5 w-5 text-red-500"

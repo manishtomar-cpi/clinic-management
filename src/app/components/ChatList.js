@@ -1,3 +1,5 @@
+// src/app/components/ChatList.jsx
+
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -59,7 +61,8 @@ const ChatList = ({ doctorId, onSelectChat }) => {
             }
 
             // Unread messages count from the chat document
-            const unreadCount = chatData.unreadCount || 0;
+            const unreadCounts = chatData.unreadCounts || {};
+            const unreadCount = unreadCounts[doctorId] || 0;
 
             return {
               id: chatDoc.id,
@@ -137,7 +140,7 @@ const ChatList = ({ doctorId, onSelectChat }) => {
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow-md p-4 mt-4">
+      <div className="bg-white rounded-lg shadow-md p-4 mt-4 h-full overflow-y-auto">
         <h2 className="text-2xl font-semibold mb-4">Messages</h2>
         {chats.length > 0 ? (
           <ul>
@@ -153,7 +156,13 @@ const ChatList = ({ doctorId, onSelectChat }) => {
                   <FaUserCircle className="text-3xl text-blue-500 mr-3" />
                   <div>
                     <h3 className="text-lg font-medium">{chat.patientName}</h3>
-                    <p className="text-sm text-gray-600 truncate">
+                    <p
+                      className={`text-sm truncate ${
+                        chat.unreadCount > 0
+                          ? "font-bold text-black"
+                          : "text-gray-600"
+                      }`}
+                    >
                       {chat.lastMessage || "No messages yet."}
                     </p>
                   </div>
@@ -180,7 +189,7 @@ const ChatList = ({ doctorId, onSelectChat }) => {
             ))}
           </ul>
         ) : (
-          <p>No chats available.</p>
+          <p className="text-gray-600 dark:text-gray-400">No chats available.</p>
         )}
       </div>
 
