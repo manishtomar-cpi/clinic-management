@@ -4,6 +4,6 @@
     "react/no-unescaped-entities": "off",
     "react-hooks/exhaustive-deps": "off", // Ignore missing dependencies in React hooks
     "react/display-name": "off",          // Ignore missing display name warnings
-    "@next/next/no-img-element": "off",   // Allow using <img> instead of <Image />
+    "@next/next/no-img-element": "off"  // Allow using <img> instead of <Image />
   }
 }
