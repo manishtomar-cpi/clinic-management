@@ -1,16 +1,16 @@
 // File: src/app/patient-dashboard/page.jsx
 
-'use client';
+"use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import { showToast } from '../components/Toast'; // Ensure correct path
-import PatientSidebar from '../components/PatientSidebar'; // Ensure correct path
-import ProtectedRoute from '../components/ProtectedRoute'; // Ensure correct path
-import MedicalSpinner from '../components/MedicalSpinner'; // Ensure correct path
-import { decryptData } from '../../lib/encryption';
-import { db } from '../../db'; // Ensure correct path
+import React, { useState, useEffect, useMemo } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { showToast } from "../components/Toast"; // Ensure correct path
+import PatientSidebar from "../components/PatientSidebar"; // Ensure correct path
+import ProtectedRoute from "../components/ProtectedRoute"; // Ensure correct path
+import MedicalSpinner from "../components/MedicalSpinner"; // Ensure correct path
+import { decryptData } from "../../lib/encryption";
+import { db } from "../../db"; // Ensure correct path
 import {
   collection,
   doc,
@@ -18,9 +18,9 @@ import {
   getDocs,
   query,
   orderBy,
-} from 'firebase/firestore';
-import { motion } from 'framer-motion';
-import Modal from 'react-modal';
+} from "firebase/firestore";
+import { motion } from "framer-motion";
+import Modal from "react-modal";
 import {
   FaHeart,
   FaCalendarAlt,
@@ -28,7 +28,7 @@ import {
   FaStickyNote,
   FaTimesCircle,
   FaStopCircle,
-} from 'react-icons/fa';
+} from "react-icons/fa";
 import {
   FiCalendar,
   FiClock,
@@ -41,35 +41,35 @@ import {
   FiArrowLeft,
   FiMoon,
   FiSun,
-} from 'react-icons/fi';
-import { Switch } from '@headlessui/react'; // For dark mode toggle
+} from "react-icons/fi";
+import { Switch } from "@headlessui/react"; // For dark mode toggle
 
 // Formatting Function
 const formatDateToDDMMYYYY = (dateStr) => {
-  if (!dateStr) return '';
-  const [year, month, day] = dateStr.split('-');
+  if (!dateStr) return "";
+  const [year, month, day] = dateStr.split("-");
   return `${day}-${month}-${year}`;
 };
 
 // Custom Styles for Modal
 const customStyles = {
   content: {
-    top: '50%',
-    left: '50%',
-    right: 'auto',
-    bottom: 'auto',
-    transform: 'translate(-50%, -50%)',
-    width: '90%',
-    maxWidth: '600px',
-    maxHeight: '80vh',
-    overflowY: 'auto',
-    borderRadius: '1.5rem',
-    padding: '2rem',
-    background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
+    top: "50%",
+    left: "50%",
+    right: "auto",
+    bottom: "auto",
+    transform: "translate(-50%, -50%)",
+    width: "90%",
+    maxWidth: "600px",
+    maxHeight: "80vh",
+    overflowY: "auto",
+    borderRadius: "1.5rem",
+    padding: "2rem",
+    background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)",
   },
   overlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
     zIndex: 1000,
   },
 };
@@ -80,40 +80,45 @@ const StatusBadge = ({ status }) => {
 
   const statusMap = {
     completed: {
-      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100',
+      color:
+        "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
       Icon: FiCheckCircle,
     },
     missed: {
-      color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
+      color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
       Icon: FaTimesCircle,
     },
     upcoming: {
-      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100',
+      color:
+        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
       Icon: FiClock,
     },
     rescheduled: {
-      color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100',
+      color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100",
       Icon: FiCalendar,
     },
-    'rescheduled but missed': {
-      color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100',
+    "rescheduled but missed": {
+      color:
+        "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100",
       Icon: FaHeart,
     },
     stopped: {
-      color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+      color: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
       Icon: FaStopCircle,
     },
     hold: {
-      color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-100',
+      color:
+        "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-100",
       Icon: FiFilter,
     },
     default: {
-      color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+      color: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
       Icon: FiClock,
     },
   };
 
-  const { color, Icon } = statusMap[status.toLowerCase()] || statusMap['default'];
+  const { color, Icon } =
+    statusMap[status.toLowerCase()] || statusMap["default"];
 
   return (
     <span
@@ -170,7 +175,8 @@ const Timeline = React.memo(({ visits, onViewDetails }) => {
               <div className="flex justify-between items-center">
                 <div>
                   <h4 className="text-lg font-semibold">
-                    Visit on {formatDateToDDMMYYYY(visit.visitDate)} at {visit.visitTime}
+                    Visit on {formatDateToDDMMYYYY(visit.visitDate)} at{" "}
+                    {visit.visitTime}
                   </h4>
                   <div className="flex items-center mt-1">
                     <StatusBadge status={visit.visitStatus} />
@@ -201,7 +207,9 @@ const Timeline = React.memo(({ visits, onViewDetails }) => {
 const ChatComponent = () => {
   return (
     <div className="p-6">
-      <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Chat with Doctor</h2>
+      <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
+        Chat with Doctor
+      </h2>
       {/* Implement chat functionality here */}
       <p>This is where the chat interface will be.</p>
     </div>
@@ -211,21 +219,21 @@ const ChatComponent = () => {
 const PatientDashboardContent = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [selectedMenuItem, setSelectedMenuItem] = useState('dashboard');
+  const [selectedMenuItem, setSelectedMenuItem] = useState("dashboard");
   const [patientData, setPatientData] = useState({
-    name: '',
-    age: '',
-    gender: '',
-    address: '',
-    mobileNumber: '',
-    email: '',
-    disease: '',
-    notes: '',
+    name: "",
+    age: "",
+    gender: "",
+    address: "",
+    mobileNumber: "",
+    email: "",
+    disease: "",
+    notes: "",
   });
   const [doctorData, setDoctorData] = useState({
-    doctorName: '',
-    clinicName: '',
-    clinicLocation: '',
+    doctorName: "",
+    clinicName: "",
+    clinicLocation: "",
   });
   const [isLoading, setIsLoading] = useState(true);
   const [visits, setVisits] = useState([]);
@@ -238,16 +246,16 @@ const PatientDashboardContent = () => {
 
   // Set the app element for React Modal
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      const appElement = document.querySelector('#__next') || document.body;
+    if (typeof document !== "undefined") {
+      const appElement = document.querySelector("#__next") || document.body;
       Modal.setAppElement(appElement);
     }
   }, []);
 
   // Initialize dark mode based on current class
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      setIsDarkMode(document.documentElement.classList.contains('dark'));
+    if (typeof document !== "undefined") {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
     }
   }, []);
 
@@ -256,9 +264,9 @@ const PatientDashboardContent = () => {
     setIsDarkMode((prev) => {
       const newMode = !prev;
       if (newMode) {
-        document.documentElement.classList.add('dark');
+        document.documentElement.classList.add("dark");
       } else {
-        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.remove("dark");
       }
       return newMode;
     });
@@ -266,11 +274,11 @@ const PatientDashboardContent = () => {
 
   useEffect(() => {
     const fetchPatientAndDoctorData = async () => {
-      if (status === 'authenticated' && session) {
+      if (status === "authenticated" && session) {
         // Check if the user has the 'patient' role
-        if (session.user.role !== 'patient') {
-          showToast('Access denied. Patients only.', 'error');
-          router.push('/patient-login'); // Redirect to login or appropriate page
+        if (session.user.role !== "patient") {
+          showToast("Access denied. Patients only.", "error");
+          router.push("/patient-login"); // Redirect to login or appropriate page
           return;
         }
 
@@ -279,7 +287,7 @@ const PatientDashboardContent = () => {
           let doctorId = null;
 
           // Fetch patient data from 'users' collection to get doctorId
-          const patientUserDocRef = doc(db, 'users', userId);
+          const patientUserDocRef = doc(db, "users", userId);
           const patientUserDoc = await getDoc(patientUserDocRef);
 
           if (patientUserDoc.exists()) {
@@ -290,9 +298,9 @@ const PatientDashboardContent = () => {
               // Fetch patient data from 'doctors/{doctorId}/patients/{patientId}'
               const patientDocRef = doc(
                 db,
-                'doctors',
+                "doctors",
                 doctorId,
-                'patients',
+                "patients",
                 userId
               );
               const patientDoc = await getDoc(patientDocRef);
@@ -303,13 +311,13 @@ const PatientDashboardContent = () => {
                 for (const key in data) {
                   // Decrypt only necessary fields
                   if (
-                    key !== 'treatmentStatus' &&
-                    key !== 'createdAt' &&
-                    key !== 'visitTimestamp' &&
-                    key !== 'visitStatus' &&
-                    key !== 'visitNumber' &&
-                    key !== 'missedCount' &&
-                    key !== 'rescheduledStatus'
+                    key !== "treatmentStatus" &&
+                    key !== "createdAt" &&
+                    key !== "visitTimestamp" &&
+                    key !== "visitStatus" &&
+                    key !== "visitNumber" &&
+                    key !== "missedCount" &&
+                    key !== "rescheduledStatus"
                   ) {
                     decryptedData[key] = decryptData(data[key]);
                   } else {
@@ -317,21 +325,21 @@ const PatientDashboardContent = () => {
                   }
                 }
                 setPatientData({
-                  name: decryptedData.name || '',
-                  age: decryptedData.age || '',
-                  gender: decryptedData.gender || '',
-                  address: decryptedData.address || '',
-                  mobileNumber: decryptedData.mobileNumber || '',
-                  email: decryptedData.email || '',
-                  disease: decryptedData.disease || '',
-                  notes: decryptedData.notes || '',
+                  name: decryptedData.name || "",
+                  age: decryptedData.age || "",
+                  gender: decryptedData.gender || "",
+                  address: decryptedData.address || "",
+                  mobileNumber: decryptedData.mobileNumber || "",
+                  email: decryptedData.email || "",
+                  disease: decryptedData.disease || "",
+                  notes: decryptedData.notes || "",
                 });
               } else {
-                showToast('Patient data not found', 'error');
+                showToast("Patient data not found", "error");
               }
 
               // Fetch doctor's data from 'users' collection
-              const doctorDocRef = doc(db, 'users', doctorId);
+              const doctorDocRef = doc(db, "users", doctorId);
               const doctorDoc = await getDoc(doctorDocRef);
 
               if (doctorDoc.exists()) {
@@ -339,10 +347,10 @@ const PatientDashboardContent = () => {
                 const decryptedData = {};
                 for (const key in data) {
                   if (
-                    key !== 'createdAt' &&
-                    key !== 'username' &&
-                    key !== 'password' &&
-                    key !== 'role'
+                    key !== "createdAt" &&
+                    key !== "username" &&
+                    key !== "password" &&
+                    key !== "role"
                   ) {
                     decryptedData[key] = decryptData(data[key]);
                   } else {
@@ -350,25 +358,25 @@ const PatientDashboardContent = () => {
                   }
                 }
                 setDoctorData({
-                  doctorName: decryptedData.doctorName || '',
-                  clinicName: decryptedData.clinicName || '',
-                  clinicLocation: decryptedData.clinicLocation || '',
+                  doctorName: decryptedData.doctorName || "",
+                  clinicName: decryptedData.clinicName || "",
+                  clinicLocation: decryptedData.clinicLocation || "",
                 });
               } else {
-                showToast('Doctor data not found', 'error');
+                showToast("Doctor data not found", "error");
               }
 
               // Fetch visits data ordered by createdAt descending
               const visitsRef = collection(
                 db,
-                'doctors',
+                "doctors",
                 doctorId,
-                'patients',
+                "patients",
                 userId,
-                'visits'
+                "visits"
               );
               const visitsSnapshot = await getDocs(
-                query(visitsRef, orderBy('createdAt', 'desc'))
+                query(visitsRef, orderBy("createdAt", "desc"))
               );
 
               const visitsData = visitsSnapshot.docs.map((visitDoc) => {
@@ -377,25 +385,25 @@ const PatientDashboardContent = () => {
                 // Handle encrypted and plaintext fields
                 const decryptedVisit = {
                   id: visitDoc.id,
-                  visitDate: visitData.visitDate || 'N/A',
-                  visitTime: visitData.visitTime || 'N/A',
+                  visitDate: visitData.visitDate || "N/A",
+                  visitTime: visitData.visitTime || "N/A",
                   visitStatus: visitData.visitStatus
                     ? visitData.visitStatus
-                    : 'N/A',
+                    : "N/A",
                   treatmentStatus: visitData.treatmentStatus
                     ? visitData.treatmentStatus
-                    : 'N/A',
-                  symptoms: decryptData(visitData.symptoms || 'N/A'),
-                  notes: decryptData(visitData.notes || 'N/A'),
-                  amountPaid: visitData.amountPaid || '0',
-                  totalAmount: visitData.totalAmount || '0',
+                    : "N/A",
+                  symptoms: decryptData(visitData.symptoms || "N/A"),
+                  notes: decryptData(visitData.notes || "N/A"),
+                  amountPaid: visitData.amountPaid || "0",
+                  totalAmount: visitData.totalAmount || "0",
                   medicines: visitData.medicines
                     ? JSON.parse(decryptData(visitData.medicines))
                     : [],
-                  visitNumber: visitData.visitNumber || 'N/A',
-                  visitReason: visitData.visitReason || 'N/A',
-                  missedCount: visitData.missedCount || '0',
-                  rescheduledStatus: visitData.rescheduledStatus || '',
+                  visitNumber: visitData.visitNumber || "N/A",
+                  visitReason: visitData.visitReason || "N/A",
+                  missedCount: visitData.missedCount || "0",
+                  rescheduledStatus: visitData.rescheduledStatus || "",
                   createdAt: visitData.createdAt
                     ? visitData.createdAt.toDate()
                     : null,
@@ -408,13 +416,13 @@ const PatientDashboardContent = () => {
               // Extract unique treatment statuses
               const uniqueTreatmentStatuses = [
                 ...new Set(visitsData.map((visit) => visit.treatmentStatus)),
-              ].filter((status) => status && status !== 'N/A');
+              ].filter((status) => status && status !== "N/A");
 
               setTreatmentStatuses(uniqueTreatmentStatuses);
 
               // Calculate Total Completed Visits
               const completedVisits = visitsData.filter(
-                (visit) => visit.visitStatus.toLowerCase() === 'completed'
+                (visit) => visit.visitStatus.toLowerCase() === "completed"
               ).length;
 
               setTotalCompletedVisits(completedVisits);
@@ -423,18 +431,16 @@ const PatientDashboardContent = () => {
               const pendingAppointments = visitsData.filter((visit) => {
                 return (
                   visit.visitStatus &&
-                  visit.visitStatus.toLowerCase() !== 'completed'
+                  visit.visitStatus.toLowerCase() !== "completed"
                 );
               });
 
               // Sort the pending appointments by date ascending
               pendingAppointments.sort((a, b) => {
                 const [dayA, monthA, yearA] = a.visitDate
-                  .split('-')
+                  .split("-")
                   .map(Number);
-                const [hoursA, minutesA] = a.visitTime
-                  .split(':')
-                  .map(Number);
+                const [hoursA, minutesA] = a.visitTime.split(":").map(Number);
                 const visitDateTimeA = new Date(
                   yearA,
                   monthA - 1,
@@ -444,11 +450,9 @@ const PatientDashboardContent = () => {
                 );
 
                 const [dayB, monthB, yearB] = b.visitDate
-                  .split('-')
+                  .split("-")
                   .map(Number);
-                const [hoursB, minutesB] = b.visitTime
-                  .split(':')
-                  .map(Number);
+                const [hoursB, minutesB] = b.visitTime.split(":").map(Number);
                 const visitDateTimeB = new Date(
                   yearB,
                   monthB - 1,
@@ -462,19 +466,22 @@ const PatientDashboardContent = () => {
 
               setPendingAppointments(pendingAppointments);
             } else {
-              showToast('Doctor ID not found in user data', 'error');
+              showToast("Doctor ID not found in user data", "error");
             }
           } else {
-            showToast('User data not found', 'error');
+            showToast("User data not found", "error");
           }
 
           setIsLoading(false);
         } catch (error) {
-          showToast('Error fetching your data. Please contact support.', 'error');
+          showToast(
+            "Error fetching your data. Please contact support.",
+            "error"
+          );
           setIsLoading(false);
         }
-      } else if (status === 'unauthenticated') {
-        router.push('/patient-login'); // Redirect to login if not authenticated
+      } else if (status === "unauthenticated") {
+        router.push("/patient-login"); // Redirect to login if not authenticated
       }
     };
 
@@ -495,17 +502,17 @@ const PatientDashboardContent = () => {
   // Function to get appointment message based on status
   const getAppointmentMessage = (appointment) => {
     const { visitStatus, visitDate, visitTime, missedCount } = appointment;
-    const dateMessage = `on ${formatDateToDDMMYYYY(
-      appointment.visitDate
-    )} at ${appointment.visitTime}`;
+    const dateMessage = `on ${formatDateToDDMMYYYY(appointment.visitDate)} at ${
+      appointment.visitTime
+    }`;
     switch (visitStatus.toLowerCase()) {
-      case 'upcoming':
+      case "upcoming":
         return `Your upcoming appointment is scheduled ${dateMessage}.`;
-      case 'missed':
+      case "missed":
         return `You missed your appointment ${dateMessage}. Please contact your doctor to reschedule.`;
-      case 'rescheduled':
+      case "rescheduled":
         return `Your appointment has been rescheduled to ${dateMessage}.`;
-      case 'rescheduled but missed':
+      case "rescheduled but missed":
         return `You missed your rescheduled appointment ${dateMessage}. Please contact your doctor.`;
       default:
         return `Your appointment is scheduled ${dateMessage}.`;
@@ -519,13 +526,13 @@ const PatientDashboardContent = () => {
         key={index}
         status={status}
         icon={
-          status.toLowerCase() === 'completed' ? (
+          status.toLowerCase() === "completed" ? (
             <FaHeart />
-          ) : status.toLowerCase() === 'ongoing' ? (
+          ) : status.toLowerCase() === "ongoing" ? (
             <FiClock />
-          ) : status.toLowerCase() === 'stopped' ? (
+          ) : status.toLowerCase() === "stopped" ? (
             <FaStopCircle />
-          ) : status.toLowerCase() === 'hold' ? (
+          ) : status.toLowerCase() === "hold" ? (
             <FiFilter />
           ) : (
             <FiCalendar />
@@ -555,7 +562,7 @@ const PatientDashboardContent = () => {
         transition={{ duration: 0.5 }}
       >
         {/* Dark Mode Toggle */}
-        <div className="flex items-center justify-end p-4">
+        {/* <div className="flex items-center justify-end p-4">
           <FiSun
             className={`mr-2 transition-transform duration-300 ${
               isDarkMode ? 'transform rotate-0' : 'transform rotate-180'
@@ -580,14 +587,14 @@ const PatientDashboardContent = () => {
               isDarkMode ? 'transform rotate-180' : 'transform rotate-0'
             }`}
           />
-        </div>
+        </div> */}
 
         {/* Conditional Rendering Based on Selected Menu Item */}
-        {selectedMenuItem === 'dashboard' && (
+        {selectedMenuItem === "dashboard" && (
           <div className="p-6">
             {/* Welcome Banner */}
             <motion.div
-              className="bg-gradient-to-r from-green-400 to-blue-500 text-white p-6 rounded-lg shadow-md mb-6 w-full"
+              className="bg-gradient-to-r from-green-400 to-blue-500 text-white p-6 rounded-lg shadow-md mb-6 w-full mt-10 sm:mt-0"
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
@@ -600,21 +607,19 @@ const PatientDashboardContent = () => {
               </p>
               {doctorData.doctorName && (
                 <p className="mt-2">
-                  Your assigned doctor:{' '}
+                  Your assigned doctor:{" "}
                   <span className="font-semibold">{doctorData.doctorName}</span>
                 </p>
               )}
               {doctorData.clinicName && (
                 <p className="mt-1">
-                  Clinic Name:{' '}
-                  <span className="font-semibold">
-                    {doctorData.clinicName}
-                  </span>
+                  Clinic Name:{" "}
+                  <span className="font-semibold">{doctorData.clinicName}</span>
                 </p>
               )}
               {doctorData.clinicLocation && (
                 <p className="mt-1">
-                  Clinic Location:{' '}
+                  Clinic Location:{" "}
                   <span className="font-semibold">
                     {doctorData.clinicLocation}
                   </span>
@@ -705,7 +710,6 @@ const PatientDashboardContent = () => {
                 gradient="from-pink-500 to-red-500"
               />
             </motion.div>
-
             {/* Pending Appointments */}
             <motion.div
               className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6 w-full"
@@ -720,16 +724,16 @@ const PatientDashboardContent = () => {
                 pendingAppointments.map((appointment) => (
                   <motion.div
                     key={appointment.id}
-                    className="flex items-center text-gray-600 dark:text-gray-300 mb-4 p-4 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700"
+                    className="flex flex-col sm:flex-row items-start sm:items-center text-gray-600 dark:text-gray-300 mb-4 p-4 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700"
                     initial={{ opacity: 0, x: -50 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.3, delay: 0.2 }}
                   >
                     <StatusBadge status={appointment.visitStatus} />
-                    <p className="ml-4">
+                    <p className="ml-0 sm:ml-4 mt-2 sm:mt-0">
                       {getAppointmentMessage(appointment)}
                       {appointment.visitStatus.toLowerCase() ===
-                        'rescheduled but missed' && (
+                        "rescheduled but missed" && (
                         <span className="ml-2 text-sm text-red-600 dark:text-red-400">
                           (Missed {appointment.missedCount} times)
                         </span>
@@ -752,7 +756,9 @@ const PatientDashboardContent = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.8 }}
             >
-              <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Health Records</h3>
+              <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
+                Health Records
+              </h3>
               {visits.length > 0 ? (
                 <Timeline visits={visits} onViewDetails={openModal} />
               ) : (
@@ -765,11 +771,11 @@ const PatientDashboardContent = () => {
           </div>
         )}
 
-        {selectedMenuItem === 'chat' && <ChatComponent />}
+        {selectedMenuItem === "chat" && <ChatComponent />}
       </motion.div>
 
       {/* Modal for Visit Details */}
-      {selectedMenuItem === 'dashboard' && (
+      {selectedMenuItem === "dashboard" && (
         <Modal
           isOpen={modalIsOpen}
           onRequestClose={closeModal}
@@ -793,7 +799,8 @@ const PatientDashboardContent = () => {
               <div className="space-y-4">
                 <p className="flex items-center">
                   <FiCalendar className="mr-2 text-blue-500 dark:text-blue-300" />
-                  <strong>Date:</strong> {formatDateToDDMMYYYY(selectedVisit.visitDate)}
+                  <strong>Date:</strong>{" "}
+                  {formatDateToDDMMYYYY(selectedVisit.visitDate)}
                 </p>
                 <p className="flex items-center">
                   <FiClock className="mr-2 text-blue-500 dark:text-blue-300" />
@@ -804,17 +811,17 @@ const PatientDashboardContent = () => {
                 </p>
                 <p className="flex items-center">
                   <StatusBadge status={selectedVisit.visitStatus} />
-                  <strong className="ml-2">Visit Status:</strong>{' '}
+                  <strong className="ml-2">Visit Status:</strong>{" "}
                   {selectedVisit.visitStatus}
                 </p>
                 <p className="flex items-center">
                   <StatusBadge status={selectedVisit.treatmentStatus} />
-                  <strong className="ml-2">Treatment Status:</strong>{' '}
+                  <strong className="ml-2">Treatment Status:</strong>{" "}
                   {selectedVisit.treatmentStatus}
                 </p>
                 {selectedVisit.rescheduledStatus && (
                   <p className="flex items-center">
-                    <strong>Rescheduled Status:</strong>{' '}
+                    <strong>Rescheduled Status:</strong>{" "}
                     {selectedVisit.rescheduledStatus}
                   </p>
                 )}
@@ -830,14 +837,14 @@ const PatientDashboardContent = () => {
                 <ul className="list-disc list-inside">
                   {selectedVisit.medicines.map((med, index) => (
                     <li key={index}>
-                      {med.name} -{' '}
+                      {med.name} -{" "}
                       {[
-                        med.timings.morning && 'Morning',
-                        med.timings.afternoon && 'Afternoon',
-                        med.timings.night && 'Night',
+                        med.timings.morning && "Morning",
+                        med.timings.afternoon && "Afternoon",
+                        med.timings.night && "Night",
                       ]
                         .filter(Boolean)
-                        .join(', ')}
+                        .join(", ")}
                     </li>
                   ))}
                 </ul>
