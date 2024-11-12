@@ -1,39 +1,16 @@
-// src/app/components/Toast.jsx
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
-"use client";
-
-import React from "react";
-import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
-
-export const showToast = (message, type = "info") => {
-  switch (type) {
-    case "success":
-      toast.success(message, {
-        position: toast.POSITION.TOP_RIGHT,
-      });
-      break;
-    case "error":
-      toast.error(message, {
-        position: toast.POSITION.TOP_RIGHT,
-      });
-      break;
-    case "warning":
-      toast.warning(message, {
-        position: toast.POSITION.TOP_RIGHT,
-      });
-      break;
-    case "info":
-    default:
-      toast.info(message, {
-        position: toast.POSITION.TOP_RIGHT,
-      });
-      break;
-  }
+export const showToast = (message, type = 'success') => {
+  toast(message, {
+    type,
+    position: 'top-center',
+    autoClose: 3000,
+    hideProgressBar: true,
+    className: 'text-sm',
+  });
 };
 
-const ToastComponent = () => {
-  return <ToastContainer />;
-};
+const Toast = () => <ToastContainer />;
 
-export default ToastComponent;
+export default Toast;
