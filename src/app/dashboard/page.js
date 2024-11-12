@@ -20,7 +20,7 @@ import PatientBalance from "../components/PatientBalance";
 import OngoingPatients from "../components/OngoingPatients";
 import AppointmentsToday from "../components/AppointmentsToday";
 import AddVisit from "../components/AddVisit";
-import MissedAppointments from "../components/MissedAppointments";
+import MissedAppointments from "../components/MissedAppointments"; // Ensure this is correctly imported
 import { decryptData } from "../../lib/encryption";
 import { db } from "../../db";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
@@ -243,7 +243,7 @@ const DashboardContent = () => {
         icon: <FiAlertCircle className="text-red-500" />,
         color: "border-red-500",
         description: "Missed appointments for today",
-        component: "MissedAppointments",
+        component: "MissedAppointments", // Ensure this is correct
       },
       {
         title: "Outstanding Balance (₹)",
@@ -313,6 +313,7 @@ const DashboardContent = () => {
   };
 
   const renderContent = () => {
+    console.log("Active Content:", activeContent); // Debugging line
     switch (activeContent) {
       case "AddPatient":
         return <AddPatient />;
@@ -330,6 +331,8 @@ const DashboardContent = () => {
         return <AppointmentsToday />;
       case "TotalPatient":
         return <TotalPatient />;
+      case "MissedAppointments": // Added case
+        return <MissedAppointments />;
       case "Messages":
         if (selectedChat) {
           return (
