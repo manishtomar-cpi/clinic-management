@@ -12,9 +12,11 @@ import { FiMenu, FiX, FiMessageSquare } from 'react-icons/fi';
 import { signOut } from 'next-auth/react';
 import { showToast } from './Toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 const PatientSidebar = ({ selectedMenuItem, onMenuItemClick }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
 
   const menuItems = [
     {
@@ -55,7 +57,7 @@ const PatientSidebar = ({ selectedMenuItem, onMenuItemClick }) => {
         <h1 className={`text-xl font-bold text-indigo-600 ${isOpen ? 'hidden' : 'block'}`}>
           ClinicEase
         </h1>
-        <button onClick={() => setIsOpen(!isOpen)}>
+        <button onClick={() => setIsOpen(!isOpen)} aria-label="Toggle Sidebar">
           {isOpen ? <FiX size={24} /> : <FiMenu size={24} />}
         </button>
       </div>
@@ -100,17 +102,25 @@ const PatientSidebar = ({ selectedMenuItem, onMenuItemClick }) => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            className="md:hidden fixed inset-0 bg-white z-50 transform transition-transform duration-300 ease-in-out"
+            className="md:hidden fixed inset-0 bg-white z-50"
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
-            transition={{ type: 'tween', duration: 0.3 }}
+            transition={{ type: 'tween', duration: 0.5, ease: 'easeInOut' }}
           >
             <div className="flex flex-col h-full">
               {/* Sidebar Header */}
               <div className="flex items-center justify-start h-20 bg-gradient-to-r from-pink-500 to-purple-600 pl-4">
                 <FaHeart size={32} color="white" />
                 <span className="ml-2 text-white text-xl font-bold">ClinicEase</span>
+                {/* Close Button inside Sidebar */}
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="ml-auto text-white"
+                  aria-label="Close Sidebar"
+                >
+                  <FiX size={24} />
+                </button>
               </div>
               {/* Sidebar Menu */}
               <nav className="flex-1 px-2 py-4 space-y-1">

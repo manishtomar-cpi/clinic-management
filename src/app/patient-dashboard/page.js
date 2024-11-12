@@ -554,7 +554,7 @@ const PatientDashboardContent = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Dark Mode Toggle
+        {/* Dark Mode Toggle */}
         <div className="flex items-center justify-end p-4">
           <FiSun
             className={`mr-2 transition-transform duration-300 ${
@@ -580,7 +580,7 @@ const PatientDashboardContent = () => {
               isDarkMode ? 'transform rotate-180' : 'transform rotate-0'
             }`}
           />
-        </div> */}
+        </div>
 
         {/* Conditional Rendering Based on Selected Menu Item */}
         {selectedMenuItem === 'dashboard' && (
