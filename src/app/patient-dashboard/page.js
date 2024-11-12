@@ -1,14 +1,16 @@
+// File: src/app/patient-dashboard/page.jsx
+
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { showToast } from '../../app/components/Toast'; // Assuming you have a Toast component
-import PatientSidebar from '../components/PatientSidebar'; // Assuming you have a Sidebar component
-import ProtectedRoute from '../components/ProtectedRoute';
-import MedicalSpinner from '../components/MedicalSpinner'; // Assuming you have a Spinner component
+import { showToast } from '../components/Toast'; // Ensure correct path
+import PatientSidebar from '../components/PatientSidebar'; // Ensure correct path
+import ProtectedRoute from '../components/ProtectedRoute'; // Ensure correct path
+import MedicalSpinner from '../components/MedicalSpinner'; // Ensure correct path
 import { decryptData } from '../../lib/encryption';
-import { db } from '../../db'; // Firebase configuration
+import { db } from '../../db'; // Ensure correct path
 import {
   collection,
   doc,
@@ -24,33 +26,29 @@ import {
   FaCalendarAlt,
   FaFileMedical,
   FaStickyNote,
+  FaTimesCircle,
+  FaStopCircle,
 } from 'react-icons/fa';
 import {
   FiCalendar,
   FiClock,
   FiCheckCircle,
-  FiUser ,
-  FiMap ,
-  FiPhone ,
+  FiUser,
+  FiMap,
+  FiPhone,
   FiMail,
   FiFilter,
   FiArrowLeft,
+  FiMoon,
+  FiSun,
 } from 'react-icons/fi';
+import { Switch } from '@headlessui/react'; // For dark mode toggle
 
-// Formatting Functions
-const formatDateToDDMMYYYY = (date) => {
-  if (!date) return '';
-  const day = date.getDate().toString().padStart(2, '0');
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const year = date.getFullYear();
+// Formatting Function
+const formatDateToDDMMYYYY = (dateStr) => {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
   return `${day}-${month}-${year}`;
-};
-
-const formatTimeToHHMM = (date) => {
-  if (!date) return '';
-  const hours = date.getHours().toString().padStart(2, '0');
-  const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${hours}:${minutes}`;
 };
 
 // Custom Styles for Modal
@@ -60,7 +58,6 @@ const customStyles = {
     left: '50%',
     right: 'auto',
     bottom: 'auto',
-    marginRight: '-50%',
     transform: 'translate(-50%, -50%)',
     width: '90%',
     maxWidth: '600px',
@@ -77,34 +74,80 @@ const customStyles = {
   },
 };
 
+// Dark Mode Toggle Component
+const DarkModeToggle = ({ isDarkMode, toggleDarkMode }) => (
+  <div className="flex items-center justify-end p-4">
+    <FiSun
+      className={`mr-2 transition-transform duration-300 ${
+        isDarkMode ? 'transform rotate-0' : 'transform rotate-180'
+      }`}
+    />
+    <Switch
+      checked={isDarkMode}
+      onChange={toggleDarkMode}
+      className={`${
+        isDarkMode ? 'bg-indigo-600' : 'bg-gray-200'
+      } relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none`}
+      aria-label="Toggle Dark Mode"
+    >
+      <span
+        className={`${
+          isDarkMode ? 'translate-x-6' : 'translate-x-1'
+        } inline-block w-4 h-4 transform bg-white rounded-full transition-transform`}
+      />
+    </Switch>
+    <FiMoon
+      className={`ml-2 transition-transform duration-300 ${
+        isDarkMode ? 'transform rotate-180' : 'transform rotate-0'
+      }`}
+    />
+  </div>
+);
+
 // Status Badge Component
-const renderStatusBadge = (status) => {
+const StatusBadge = ({ status }) => {
   if (!status) return null;
 
-  let colorClasses;
-  let Icon;
+  const statusMap = {
+    completed: {
+      color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100',
+      Icon: FiCheckCircle,
+    },
+    missed: {
+      color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
+      Icon: FaTimesCircle,
+    },
+    upcoming: {
+      color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100',
+      Icon: FiClock,
+    },
+    rescheduled: {
+      color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100',
+      Icon: FiCalendar,
+    },
+    'rescheduled but missed': {
+      color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100',
+      Icon: FaHeart,
+    },
+    stopped: {
+      color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+      Icon: FaStopCircle,
+    },
+    hold: {
+      color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-100',
+      Icon: FiFilter,
+    },
+    default: {
+      color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+      Icon: FiClock,
+    },
+  };
 
-  switch (status.toLowerCase()) {
-    case 'completed':
-      colorClasses = 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100';
-      Icon = FiCheckCircle;
-      break;
-    case 'missed':
-      colorClasses = 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
-      Icon = FaHeart; // Using FaHeart as an example; replace with appropriate icon
-      break;
-    case 'upcoming':
-      colorClasses = 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100';
-      Icon = FiClock;
-      break;
-    default:
-      colorClasses = 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
-      Icon = FiClock;
-  }
+  const { color, Icon } = statusMap[status.toLowerCase()] || statusMap['default'];
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${colorClasses}`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${color}`}
     >
       <Icon className="mr-1 text-sm" />
       {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -113,7 +156,7 @@ const renderStatusBadge = (status) => {
 };
 
 // Info Card Component
-const InfoCard = ({ label, value, icon, gradient }) => (
+const InfoCard = React.memo(({ label, value, icon, gradient }) => (
   <motion.div
     className={`flex items-center p-4 rounded-lg shadow hover:shadow-lg transition-shadow bg-gradient-to-r ${gradient} text-white`}
     initial={{ opacity: 0, y: 10 }}
@@ -123,10 +166,66 @@ const InfoCard = ({ label, value, icon, gradient }) => (
     <div className="text-3xl mr-4">{icon}</div>
     <div>
       <p className="font-semibold">{label}</p>
-      <p className="">{value}</p>
+      <p className="text-lg">{value}</p>
     </div>
   </motion.div>
-);
+));
+
+// Treatment Status Card Component
+const TreatmentStatusCard = React.memo(({ status, icon }) => (
+  <motion.div
+    className="flex items-center p-4 rounded-lg shadow-lg bg-white dark:bg-gray-800"
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.3 }}
+  >
+    <div className="text-3xl mr-4 text-indigo-500">{icon}</div>
+    <div>
+      <p className="font-semibold capitalize">{status}</p>
+    </div>
+  </motion.div>
+));
+
+// Timeline Component
+const Timeline = React.memo(({ visits, onViewDetails }) => {
+  return (
+    <div className="relative">
+      <div className="border-l-2 border-gray-300 dark:border-gray-700">
+        {visits.map((visit, index) => (
+          <div key={visit.id} className="mb-8 ml-4">
+            <div className="absolute -left-3.5 mt-1.5 w-7 h-7 rounded-full bg-blue-500 text-white flex items-center justify-center">
+              <FiCalendar className="text-xl" />
+            </div>
+            <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h4 className="text-lg font-semibold">
+                    Visit on {formatDateToDDMMYYYY(visit.visitDate)} at {visit.visitTime}
+                  </h4>
+                  <div className="flex items-center mt-1">
+                    <StatusBadge status={visit.visitStatus} />
+                    <span className="ml-2">{visit.visitReason}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => onViewDetails(visit)}
+                  className="text-blue-500 hover:text-blue-700 font-medium focus:outline-none"
+                >
+                  View Details
+                </button>
+              </div>
+              {visit.notes && (
+                <p className="mt-2 text-gray-600 dark:text-gray-400">
+                  <strong>Notes:</strong> {visit.notes}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
 
 const PatientDashboardContent = () => {
   const { data: session, status } = useSession();
@@ -148,9 +247,12 @@ const PatientDashboardContent = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [visits, setVisits] = useState([]);
-  const [nextAppointment, setNextAppointment] = useState(null);
+  const [pendingAppointments, setPendingAppointments] = useState([]);
+  const [treatmentStatuses, setTreatmentStatuses] = useState([]);
+  const [totalCompletedVisits, setTotalCompletedVisits] = useState(0);
   const [modalIsOpen, setIsOpen] = useState(false);
   const [selectedVisit, setSelectedVisit] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Set the app element for React Modal
   useEffect(() => {
@@ -159,6 +261,26 @@ const PatientDashboardContent = () => {
       Modal.setAppElement(appElement);
     }
   }, []);
+
+  // Initialize dark mode based on current class
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      setIsDarkMode(document.documentElement.classList.contains('dark'));
+    }
+  }, []);
+
+  // Dark Mode Toggle Handler
+  const toggleDarkMode = () => {
+    setIsDarkMode((prev) => {
+      const newMode = !prev;
+      if (newMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      return newMode;
+    });
+  };
 
   useEffect(() => {
     const fetchPatientAndDoctorData = async () => {
@@ -172,7 +294,6 @@ const PatientDashboardContent = () => {
 
         try {
           const userId = session.user.id; // Patient's user ID
-          console.log('Patient User ID:', userId);
           let doctorId = null;
 
           // Fetch patient data from 'users' collection to get doctorId
@@ -181,11 +302,9 @@ const PatientDashboardContent = () => {
 
           if (patientUserDoc.exists()) {
             const userData = patientUserDoc.data();
-            console.log('Patient User Data:', userData);
             doctorId = userData.doctorId;
 
             if (doctorId) {
-              console.log('Doctor ID:', doctorId);
               // Fetch patient data from 'doctors/{doctorId}/patients/{patientId}'
               const patientDocRef = doc(
                 db,
@@ -198,7 +317,6 @@ const PatientDashboardContent = () => {
 
               if (patientDoc.exists()) {
                 const data = patientDoc.data();
-                console.log('Patient Data under Doctor:', data);
                 const decryptedData = {};
                 for (const key in data) {
                   // Decrypt only necessary fields
@@ -208,14 +326,14 @@ const PatientDashboardContent = () => {
                     key !== 'visitTimestamp' &&
                     key !== 'visitStatus' &&
                     key !== 'visitNumber' &&
-                    key !== 'missedCount'
+                    key !== 'missedCount' &&
+                    key !== 'rescheduledStatus'
                   ) {
                     decryptedData[key] = decryptData(data[key]);
                   } else {
                     decryptedData[key] = data[key];
                   }
                 }
-                console.log('Decrypted Patient Data:', decryptedData);
                 setPatientData({
                   name: decryptedData.name || '',
                   age: decryptedData.age || '',
@@ -228,7 +346,6 @@ const PatientDashboardContent = () => {
                 });
               } else {
                 showToast('Patient data not found', 'error');
-                console.error('Patient document does not exist.');
               }
 
               // Fetch doctor's data from 'users' collection
@@ -237,7 +354,6 @@ const PatientDashboardContent = () => {
 
               if (doctorDoc.exists()) {
                 const data = doctorDoc.data();
-                console.log('Doctor Data:', data);
                 const decryptedData = {};
                 for (const key in data) {
                   if (
@@ -251,7 +367,6 @@ const PatientDashboardContent = () => {
                     decryptedData[key] = data[key];
                   }
                 }
-                console.log('Decrypted Doctor Data:', decryptedData);
                 setDoctorData({
                   doctorName: decryptedData.doctorName || '',
                   clinicName: decryptedData.clinicName || '',
@@ -259,10 +374,9 @@ const PatientDashboardContent = () => {
                 });
               } else {
                 showToast('Doctor data not found', 'error');
-                console.error('Doctor document does not exist.');
               }
 
-              // Fetch visits data ordered by visitTimestamp ascending
+              // Fetch visits data ordered by createdAt descending
               const visitsRef = collection(
                 db,
                 'doctors',
@@ -272,106 +386,108 @@ const PatientDashboardContent = () => {
                 'visits'
               );
               const visitsSnapshot = await getDocs(
-                query(visitsRef, orderBy('visitTimestamp', 'asc'))
+                query(visitsRef, orderBy('createdAt', 'desc'))
               );
 
               const visitsData = visitsSnapshot.docs.map((visitDoc) => {
                 const visitData = visitDoc.data();
-                console.log('Raw Visit Data:', visitData);
 
                 // Handle encrypted and plaintext fields
                 const decryptedVisit = {
                   id: visitDoc.id,
-                  visitDate: visitData.visitTimestamp
-                    ? formatDateToDDMMYYYY(visitData.visitTimestamp.toDate())
-                    : 'N/A',
-                  visitTime: visitData.visitTimestamp
-                    ? formatTimeToHHMM(visitData.visitTimestamp.toDate())
-                    : 'N/A',
+                  visitDate: visitData.visitDate || 'N/A',
+                  visitTime: visitData.visitTime || 'N/A',
                   visitStatus: visitData.visitStatus
-                    ? decryptData(visitData.visitStatus)
+                    ? visitData.visitStatus
                     : 'N/A',
                   treatmentStatus: visitData.treatmentStatus
-                    ? decryptData(visitData.treatmentStatus)
+                    ? visitData.treatmentStatus
                     : 'N/A',
-                  symptoms: visitData.symptoms
-                    ? decryptData(visitData.symptoms)
-                    : 'N/A',
-                  notes: visitData.notes ? decryptData(visitData.notes) : 'N/A',
-                  amountPaid: visitData.amountPaid
-                    ? decryptData(visitData.amountPaid)
-                    : '0',
-                  totalAmount: visitData.totalAmount
-                    ? decryptData(visitData.totalAmount)
-                    : '0',
+                  symptoms: decryptData(visitData.symptoms || 'N/A'),
+                  notes: decryptData(visitData.notes || 'N/A'),
+                  amountPaid: visitData.amountPaid || '0',
+                  totalAmount: visitData.totalAmount || '0',
                   medicines: visitData.medicines
                     ? JSON.parse(decryptData(visitData.medicines))
                     : [],
-                  visitNumber: visitData.visitNumber
-                    ? decryptData(visitData.visitNumber)
-                    : 'N/A',
-                  missedCount: visitData.missedCount
-                    ? decryptData(visitData.missedCount)
-                    : '0',
+                  visitNumber: visitData.visitNumber || 'N/A',
+                  visitReason: visitData.visitReason || 'N/A',
+                  missedCount: visitData.missedCount || '0',
+                  rescheduledStatus: visitData.rescheduledStatus || '',
                   createdAt: visitData.createdAt
                     ? visitData.createdAt.toDate()
                     : null,
                 };
-                console.log('Decrypted Visit:', decryptedVisit);
                 return decryptedVisit;
               });
 
               setVisits(visitsData);
-              console.log('All Visits:', visitsData);
 
-              // Find the next upcoming appointment
-              const now = new Date();
-              const upcomingVisits = visitsData.filter((visit) => {
-                if (visit.visitDate === 'N/A' || visit.visitTime === 'N/A') return false;
-                const [day, month, year] = visit.visitDate.split('-').map(Number);
-                const [hours, minutes] = visit.visitTime.split(':').map(Number);
-                const visitDateTime = new Date(year, month - 1, day, hours, minutes);
+              // Extract unique treatment statuses
+              const uniqueTreatmentStatuses = [
+                ...new Set(visitsData.map((visit) => visit.treatmentStatus)),
+              ].filter((status) => status && status !== 'N/A');
+
+              setTreatmentStatuses(uniqueTreatmentStatuses);
+
+              // Calculate Total Completed Visits
+              const completedVisits = visitsData.filter(
+                (visit) => visit.visitStatus.toLowerCase() === 'completed'
+              ).length;
+
+              setTotalCompletedVisits(completedVisits);
+
+              // Find all appointments with status not 'Completed'
+              const pendingAppointments = visitsData.filter((visit) => {
                 return (
-                  visitDateTime > now &&
-                  visit.visitStatus.toLowerCase() !== 'missed' &&
+                  visit.visitStatus &&
                   visit.visitStatus.toLowerCase() !== 'completed'
                 );
               });
 
-              console.log('Upcoming Visits:', upcomingVisits);
+              // Sort the pending appointments by date ascending
+              pendingAppointments.sort((a, b) => {
+                const [dayA, monthA, yearA] = a.visitDate
+                  .split('-')
+                  .map(Number);
+                const [hoursA, minutesA] = a.visitTime
+                  .split(':')
+                  .map(Number);
+                const visitDateTimeA = new Date(
+                  yearA,
+                  monthA - 1,
+                  dayA,
+                  hoursA,
+                  minutesA
+                );
 
-              if (upcomingVisits.length > 0) {
-                // Sort upcoming visits by date
-                upcomingVisits.sort((a, b) => {
-                  const [dayA, monthA, yearA] = a.visitDate.split('-').map(Number);
-                  const [hoursA, minutesA] = a.visitTime.split(':').map(Number);
-                  const visitDateTimeA = new Date(yearA, monthA - 1, dayA, hoursA, minutesA);
+                const [dayB, monthB, yearB] = b.visitDate
+                  .split('-')
+                  .map(Number);
+                const [hoursB, minutesB] = b.visitTime
+                  .split(':')
+                  .map(Number);
+                const visitDateTimeB = new Date(
+                  yearB,
+                  monthB - 1,
+                  dayB,
+                  hoursB,
+                  minutesB
+                );
 
-                  const [dayB, monthB, yearB] = b.visitDate.split('-').map(Number);
-                  const [hoursB, minutesB] = b.visitTime.split(':').map(Number);
-                  const visitDateTimeB = new Date(yearB, monthB - 1, dayB, hoursB, minutesB);
+                return visitDateTimeA - visitDateTimeB;
+              });
 
-                  return visitDateTimeA - visitDateTimeB;
-                });
-
-                setNextAppointment(upcomingVisits[0]);
-                console.log('Next Appointment:', upcomingVisits[0]);
-              } else {
-                setNextAppointment(null);
-                console.log('No upcoming appointments.');
-              }
+              setPendingAppointments(pendingAppointments);
             } else {
               showToast('Doctor ID not found in user data', 'error');
-              console.error('Doctor ID missing.');
             }
           } else {
             showToast('User data not found', 'error');
-            console.error('Patient user document does not exist.');
           }
 
           setIsLoading(false);
         } catch (error) {
-          console.error('Error fetching data:', error);
           showToast('Error fetching your data. Please contact support.', 'error');
           setIsLoading(false);
         }
@@ -394,38 +510,68 @@ const PatientDashboardContent = () => {
     setSelectedVisit(null);
   };
 
-  // Custom styles for Modal (if different from above)
-  // const customStyles = { ... };
-
-  // Determine if there are any errors during visits fetching
-  useEffect(() => {
-    if (visits.length === 0 && !isLoading) {
-      showToast('No visits found for your profile.', 'info');
+  // Function to get appointment message based on status
+  const getAppointmentMessage = (appointment) => {
+    const { visitStatus, visitDate, visitTime, missedCount } = appointment;
+    const dateMessage = `on ${formatDateToDDMMYYYY(
+      appointment.visitDate
+    )} at ${appointment.visitTime}`;
+    switch (visitStatus.toLowerCase()) {
+      case 'upcoming':
+        return `Your upcoming appointment is scheduled ${dateMessage}.`;
+      case 'missed':
+        return `You missed your appointment ${dateMessage}. Please contact your doctor to reschedule.`;
+      case 'rescheduled':
+        return `Your appointment has been rescheduled to ${dateMessage}.`;
+      case 'rescheduled but missed':
+        return `You missed your rescheduled appointment ${dateMessage}. Please contact your doctor.`;
+      default:
+        return `Your appointment is scheduled ${dateMessage}.`;
     }
-  }, [visits, isLoading]);
+  };
 
-  // Determine next appointment has been set
-  useEffect(() => {
-    if (nextAppointment) {
-      console.log('Next Appointment:', nextAppointment);
-    } else {
-      console.log('No upcoming appointments.');
-    }
-  }, [nextAppointment]);
+  // Memoized Components for Performance
+  const memoizedTreatmentStatusCards = useMemo(() => {
+    return treatmentStatuses.map((status, index) => (
+      <TreatmentStatusCard
+        key={index}
+        status={status}
+        icon={
+          status.toLowerCase() === 'completed' ? (
+            <FaHeart />
+          ) : status.toLowerCase() === 'ongoing' ? (
+            <FiClock />
+          ) : status.toLowerCase() === 'stopped' ? (
+            <FaStopCircle />
+          ) : status.toLowerCase() === 'hold' ? (
+            <FiFilter />
+          ) : (
+            <FiCalendar />
+          )
+        }
+      />
+    ));
+  }, [treatmentStatuses]);
 
   if (isLoading) {
     return <MedicalSpinner />;
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
+      {/* Sidebar */}
       <PatientSidebar />
+
+      {/* Main Content */}
       <motion.div
-        className="flex-1 overflow-auto bg-gray-100 ml-0 md:ml-64"
+        className="flex-1 overflow-auto ml-0 md:ml-64 transition-all duration-300"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
+        {/* Dark Mode Toggle */}
+        {/* <DarkModeToggle isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode} /> */}
+
         <div className="p-6">
           {/* Welcome Banner */}
           <motion.div
@@ -437,7 +583,9 @@ const PatientDashboardContent = () => {
             <h2 className="text-3xl font-bold mb-2">
               Welcome, {patientData.name}!
             </h2>
-            <p className="text-lg">Managing your health has never been easier.</p>
+            <p className="text-lg">
+              Managing your health has never been easier.
+            </p>
             {doctorData.doctorName && (
               <p className="mt-2">
                 Your assigned doctor:{' '}
@@ -447,24 +595,78 @@ const PatientDashboardContent = () => {
             {doctorData.clinicName && (
               <p className="mt-1">
                 Clinic Name:{' '}
-                <span className="font-semibold">{doctorData.clinicName}</span>
+                <span className="font-semibold">
+                  {doctorData.clinicName}
+                </span>
               </p>
             )}
             {doctorData.clinicLocation && (
               <p className="mt-1">
                 Clinic Location:{' '}
-                <span className="font-semibold">{doctorData.clinicLocation}</span>
+                <span className="font-semibold">
+                  {doctorData.clinicLocation}
+                </span>
               </p>
             )}
           </motion.div>
+
+          {/* Treatment Status Section */}
+<motion.div
+  className="mb-6"
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.5, delay: 0.3 }}
+>
+  <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
+    Treatment Status
+  </h3>
+  {treatmentStatuses.length > 0 ? (
+    <div className="flex flex-wrap items-center gap-4">
+      {treatmentStatuses.map((status, index) => (
+        <div
+          key={index}
+          className="flex items-center gap-2 text-gray-800 dark:text-gray-200"
+        >
+          {/* Status Dot */}
+          <span
+            className={`w-3 h-3 rounded-full ${
+              status === "Completed"
+                ? "bg-yellow-500"
+                : status === "Ongoing"
+                ? "bg-green-500"
+                : status === "Hold"
+                ? "bg-red-500"
+                : "bg-gray-400"
+            }`}
+          ></span>
+          {/* Status Label */}
+          <span className="text-sm font-medium">{status}</span>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p className="text-gray-600 dark:text-gray-400">
+      No treatment statuses available.
+    </p>
+  )}
+</motion.div>
+
+
+       
 
           {/* Patient Information Cards */}
           <motion.div
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
           >
+            <InfoCard
+              label="Total Completed Visits"
+              value={totalCompletedVisits}
+              icon={<FiCheckCircle />}
+              gradient="from-purple-500 to-pink-500"
+            />
             <InfoCard
               label="Name"
               value={patientData.name}
@@ -515,60 +717,57 @@ const PatientDashboardContent = () => {
             />
           </motion.div>
 
-          {/* Upcoming Appointments */}
+          {/* Pending Appointments */}
           <motion.div
-            className="bg-white shadow-md rounded-lg p-6 mb-6 w-full"
+            className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6 w-full"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.6 }}
           >
-            <h3 className="text-2xl font-semibold mb-4">Upcoming Appointments</h3>
-            {nextAppointment ? (
-              <div className="flex items-center text-gray-600">
-                <FaCalendarAlt className="text-2xl mr-2 animate-pulse" />
-                <p>
-                  Your next appointment is on{' '}
-                  <span className="font-semibold">
-                    {nextAppointment.visitDate} at {nextAppointment.visitTime}
-                  </span>
-                </p>
-              </div>
+            <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">
+              Pending Appointments
+            </h3>
+            {pendingAppointments && pendingAppointments.length > 0 ? (
+              pendingAppointments.map((appointment) => (
+                <motion.div
+                  key={appointment.id}
+                  className="flex items-center text-gray-600 dark:text-gray-300 mb-4 p-4 rounded-lg shadow-sm bg-gray-50 dark:bg-gray-700"
+                  initial={{ opacity: 0, x: -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.2 }}
+                >
+                  <StatusBadge status={appointment.visitStatus} />
+                  <p className="ml-4">
+                    {getAppointmentMessage(appointment)}
+                    {appointment.visitStatus.toLowerCase() ===
+                      'rescheduled but missed' && (
+                      <span className="ml-2 text-sm text-red-600 dark:text-red-400">
+                        (Missed {appointment.missedCount} times)
+                      </span>
+                    )}
+                  </p>
+                </motion.div>
+              ))
             ) : (
-              <div className="flex items-center text-gray-600">
-                <FaCalendarAlt className="text-2xl mr-2 animate-pulse" />
-                <p>You have no upcoming appointments scheduled.</p>
+              <div className="flex items-center text-gray-600 dark:text-gray-400">
+                <FiClock className="text-2xl mr-2 animate-pulse" />
+                <p>You have no pending appointments.</p>
               </div>
             )}
           </motion.div>
 
-          {/* Health Records */}
+          {/* Health Records Timeline */}
           <motion.div
-            className="bg-white shadow-md rounded-lg p-6 mb-6 w-full"
+            className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-6 w-full"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.8 }}
           >
-            <h3 className="text-2xl font-semibold mb-4">Health Records</h3>
+            <h3 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Health Records</h3>
             {visits.length > 0 ? (
-              <div className="space-y-4">
-                {visits.map((visit) => (
-                  <div
-                    key={visit.id}
-                    className="flex items-center text-gray-600 mb-4 cursor-pointer hover:bg-gray-100 p-2 rounded"
-                    onClick={() => openModal(visit)}
-                  >
-                    <FaFileMedical className="text-2xl mr-2" />
-                    <p>
-                      Visit on{' '}
-                      <span className="font-semibold">
-                        {visit.visitDate} at {visit.visitTime}
-                      </span>
-                    </p>
-                  </div>
-                ))}
-              </div>
+              <Timeline visits={visits} onViewDetails={openModal} />
             ) : (
-              <div className="flex items-center text-gray-600">
+              <div className="flex items-center text-gray-600 dark:text-gray-400">
                 <FaHeart className="text-2xl mr-2 animate-pulse" />
                 <p>Your health records will appear here once available.</p>
               </div>
@@ -587,10 +786,12 @@ const PatientDashboardContent = () => {
         {selectedVisit && (
           <div>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-blue-700">Visit Details</h2>
+              <h2 className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                Visit Details
+              </h2>
               <button
                 onClick={closeModal}
-                className="text-white bg-red-500 hover:bg-red-600 rounded-full w-8 h-8 flex items-center justify-center"
+                className="text-white bg-red-500 hover:bg-red-600 dark:bg-red-700 dark:hover:bg-red-800 rounded-full w-8 h-8 flex items-center justify-center focus:outline-none"
                 aria-label="Close modal"
               >
                 &times;
@@ -598,24 +799,32 @@ const PatientDashboardContent = () => {
             </div>
             <div className="space-y-4">
               <p className="flex items-center">
-                <FiCalendar className="mr-2 text-blue-500" />
-                <strong>Date:</strong> {selectedVisit.visitDate}
+                <FiCalendar className="mr-2 text-blue-500 dark:text-blue-300" />
+                <strong>Date:</strong> {formatDateToDDMMYYYY(selectedVisit.visitDate)}
               </p>
               <p className="flex items-center">
-                <FiClock className="mr-2 text-blue-500" />
+                <FiClock className="mr-2 text-blue-500 dark:text-blue-300" />
                 <strong>Time:</strong> {selectedVisit.visitTime}
               </p>
               <p>
                 <strong>Visit Number:</strong> {selectedVisit.visitNumber}
               </p>
               <p className="flex items-center">
-                {renderStatusBadge(selectedVisit.visitStatus)}
-                <strong className="ml-2">Visit Status:</strong> {selectedVisit.visitStatus}
+                <StatusBadge status={selectedVisit.visitStatus} />
+                <strong className="ml-2">Visit Status:</strong>{' '}
+                {selectedVisit.visitStatus}
               </p>
               <p className="flex items-center">
-                {renderStatusBadge(selectedVisit.treatmentStatus)}
-                <strong className="ml-2">Treatment Status:</strong> {selectedVisit.treatmentStatus}
+                <StatusBadge status={selectedVisit.treatmentStatus} />
+                <strong className="ml-2">Treatment Status:</strong>{' '}
+                {selectedVisit.treatmentStatus}
               </p>
+              {selectedVisit.rescheduledStatus && (
+                <p className="flex items-center">
+                  <strong>Rescheduled Status:</strong>{' '}
+                  {selectedVisit.rescheduledStatus}
+                </p>
+              )}
               <p>
                 <strong>Reason for Visit:</strong> {selectedVisit.visitReason}
               </p>
@@ -658,8 +867,7 @@ const PatientDashboardContent = () => {
   );
 };
 
-// Wrap the content with ProtectedRoute if necessary
-// Assuming you have a ProtectedRoute component to handle route protection
+// Wrap the content with ProtectedRoute
 const PatientDashboardPage = () => {
   return (
     <ProtectedRoute>
