@@ -40,15 +40,16 @@ const PatientSidebar = ({ selectedMenuItem, onMenuItemClick }) => {
 
   const handleLogout = async () => {
     try {
-      // Sign out without redirecting
-      await signOut({ redirect: false });
-      router.push('/patient-login'); // Manually redirect
+      // Sign out and redirect to '/patient-login'
+      await signOut({ callbackUrl: '/patient-login' });
+      // Optionally, show a toast notification
       showToast('You have successfully logged out!', 'success');
     } catch (error) {
       console.error('Logout Error:', error);
       showToast('Error logging out. Please try again.', 'error');
     }
   };
+  
 
   return (
     <>
