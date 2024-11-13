@@ -5,7 +5,7 @@ import * as admin from 'firebase-admin';
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
-      // Replace the following with your Firebase project credentials
+   
       type: process.env.FIREBASE_TYPE,
       project_id: process.env.FIREBASE_PROJECT_ID,
       private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
@@ -17,8 +17,7 @@ if (!admin.apps.length) {
       auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
       client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
     }),
-    // Optionally, specify the database URL
-    // databaseURL: 'https://<your-database-name>.firebaseio.com',
+
   });
 }
 

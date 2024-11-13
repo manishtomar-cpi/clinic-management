@@ -1,3 +1,5 @@
+// src/app/components/DoctorChatComponent.jsx
+
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -71,7 +73,10 @@ const DoctorChatComponent = ({ chatId, otherUserId, onBack }) => {
           patientId: otherId,
           lastMessage: "",
           lastMessageTimestamp: null,
-          unreadCount: 0,
+          unreadCounts: {
+            [userId]: 0,
+            [otherId]: 0,
+          },
         });
       }
     };
@@ -157,13 +162,11 @@ const DoctorChatComponent = ({ chatId, otherUserId, onBack }) => {
           batch.update(doc.ref, { read: true });
         });
 
-        // Update unreadCount in chat document
+        // Update unreadCounts in chat document
         const chatDocRef = doc(db, "chats", chatId);
-        batch.set(
-          chatDocRef,
-          { unreadCount: increment(-snapshot.size) },
-          { merge: true }
-        );
+        batch.update(chatDocRef, {
+          [`unreadCounts.${userId}`]: 0,
+        });
 
         await batch.commit();
       } catch (error) {
@@ -183,7 +186,7 @@ const DoctorChatComponent = ({ chatId, otherUserId, onBack }) => {
     };
 
     markMessagesAsRead();
-  }, [chatId, otherId, messages]);
+  }, [chatId, otherId, messages, userId]);
 
   const handleSendMessage = async () => {
     if (inputMessage.trim() === "") return;
@@ -200,12 +203,13 @@ const DoctorChatComponent = ({ chatId, otherUserId, onBack }) => {
     try {
       await addDoc(collection(db, "chats", chatId, "messages"), messageData);
 
-      // Update lastMessage, lastMessageTimestamp
+      // Update lastMessage, lastMessageTimestamp, and increment unreadCounts for the patient
       await setDoc(
         doc(db, "chats", chatId),
         {
           lastMessage: encryptedMessage,
           lastMessageTimestamp: serverTimestamp(),
+          [`unreadCounts.${otherId}`]: increment(1), // Increment unread count for patient
         },
         { merge: true }
       );
@@ -314,7 +318,7 @@ const DoctorChatComponent = ({ chatId, otherUserId, onBack }) => {
   return (
     <>
       <div
-        className={`flex flex-col h-screen ${
+        className={`flex flex-col h-full ${
           isMobile ? "mt-16" : "mt-4"
         } px-4 md:px-8 lg:px-16 xl:px-32`} // Adjust padding for different screen sizes
       >
@@ -393,7 +397,9 @@ const DoctorChatComponent = ({ chatId, otherUserId, onBack }) => {
                         </span>
                         {isOwnMessage && (
                           <span
-                            className={`text-xs flex items-center text-green-700`}
+                            className={`text-xs flex items-center ${
+                              msg.read ? "text-green-700" : "text-gray-700"
+                            }`}
                           >
                             {msg.read ? (
                               <>

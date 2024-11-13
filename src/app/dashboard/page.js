@@ -1,3 +1,5 @@
+// src/app/dashboard/page.js
+
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
@@ -267,7 +269,7 @@ const DashboardContent = () => {
         const counts = {};
         snapshot.docs.forEach((chatDoc) => {
           const chatData = chatDoc.data();
-          counts[chatDoc.id] = chatData.unreadCount || 0;
+          counts[chatDoc.id] = chatData.unreadCounts?.[doctorId] || 0;
         });
         setUnreadCounts(counts);
       });
@@ -275,8 +277,10 @@ const DashboardContent = () => {
       return () => unsubscribe();
     };
 
-    fetchUnreadCounts();
-  }, [session.user.id]);
+    if (session?.user?.id) {
+      fetchUnreadCounts();
+    }
+  }, [session?.user?.id]);
 
   // Compute total unread messages
   const totalUnread = useMemo(() => {
@@ -313,7 +317,6 @@ const DashboardContent = () => {
   };
 
   const renderContent = () => {
-    console.log("Active Content:", activeContent); // Debugging line
     switch (activeContent) {
       case "AddPatient":
         return <AddPatient />;
@@ -411,4 +414,3 @@ const DashboardPage = () => {
 };
 
 export default DashboardPage;
-// this is the 
