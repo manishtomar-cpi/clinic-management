@@ -25,6 +25,7 @@ import {
 } from "react-icons/fa";
 import { FiSearch } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
+import { showToast } from "./Toast"; // Ensure you have a Toast component
 
 const ChatList = ({ doctorId, onSelectChat }) => {
   const [patients, setPatients] = useState([]);
@@ -64,12 +65,12 @@ const ChatList = ({ doctorId, onSelectChat }) => {
             })
             .catch((error) => {
               console.error("Error fetching patients data:", error);
-              // Implement your toast notification here
+              showToast("Error fetching patients data.", "error");
             });
         },
         (error) => {
           console.error("Error fetching patients:", error);
-          // Implement your toast notification here
+          showToast("Error fetching patients data.", "error");
         }
       );
 
@@ -101,9 +102,11 @@ const ChatList = ({ doctorId, onSelectChat }) => {
             const patientDoc = await getDoc(patientDocRef);
 
             let patientName = "Unknown Patient";
+            let treatmentStatus = "Unknown";
             if (patientDoc.exists()) {
               const data = patientDoc.data();
               patientName = data.name ? decryptData(data.name) : "Patient";
+              treatmentStatus = data.treatmentStatus || "Unknown";
             }
 
             // Unread messages count from the chat document
@@ -117,6 +120,7 @@ const ChatList = ({ doctorId, onSelectChat }) => {
               id: chatDoc.id,
               patientId,
               patientName,
+              treatmentStatus,
               lastMessage: decryptData(chatData.lastMessage || ""),
               lastMessageTimestamp: chatData.lastMessageTimestamp,
               unreadCount,
@@ -129,12 +133,12 @@ const ChatList = ({ doctorId, onSelectChat }) => {
             setChats(chatsData.filter((chat) => chat !== null));
           } catch (error) {
             console.error("Error fetching chat data:", error);
-            // Implement your toast notification here
+            showToast("Error fetching chat data.", "error");
           }
         },
         (error) => {
           console.error("Error fetching chats:", error);
-          // Implement your toast notification here
+          showToast("Error fetching chats.", "error");
         }
       );
 
@@ -181,11 +185,11 @@ const ChatList = ({ doctorId, onSelectChat }) => {
   const handleDeleteChat = async (chatId) => {
     try {
       await deleteDoc(doc(db, "chats", chatId));
-      // Implement your toast notification here
+      showToast("Chat deleted successfully.", "success");
       setModal({ isOpen: false, chatId: null, patientName: "" });
     } catch (error) {
       console.error("Error deleting chat:", error);
-      // Implement your toast notification here
+      showToast("Error deleting chat.", "error");
       setModal({ isOpen: false, chatId: null, patientName: "" });
     }
   };
@@ -299,7 +303,19 @@ const ChatList = ({ doctorId, onSelectChat }) => {
                     className="flex items-center flex-grow cursor-pointer group"
                     onClick={() => onSelectChat(chat)}
                   >
-                    <FaUserCircle className="text-3xl text-blue-500 mr-3" />
+                    {/* Updated Patient Icon with Border */}
+                    <div
+                      className={`w-12 h-12 rounded-full border-4 ${statusColorMap[chat.treatmentStatus]} flex items-center justify-center relative mr-3`}
+                    >
+                      <FaUserCircle className="text-2xl text-gray-500" />
+                      {/* Status Icon */}
+                      {statusIconMap[chat.treatmentStatus] && (
+                        <div className="absolute bottom-0 right-0 bg-white rounded-full p-1 border border-gray-200">
+                          {statusIconMap[chat.treatmentStatus]}
+                        </div>
+                      )}
+                    </div>
+
                     <div className="flex flex-col">
                       <h3 className="text-lg font-medium group-hover:text-blue-600">
                         {chat.patientName}
@@ -353,6 +369,6 @@ const ChatList = ({ doctorId, onSelectChat }) => {
       </div>
     </>
   );
-}; 
+};
 
 export default ChatList;
