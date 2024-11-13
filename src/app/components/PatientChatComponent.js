@@ -334,7 +334,7 @@ const PatientChatComponent = () => {
         <div className="flex items-center p-4 bg-white shadow rounded-lg mb-4">
           <FaUserMd className="text-2xl text-teal-500 mr-2" />
           <h2 className="text-xl font-bold text-black">
-            Chat with {doctorName || "Loading..."}
+            Chat with Dr.{doctorName || "Loading..."}
           </h2>
           <button
             onClick={toggleSelectMode}
