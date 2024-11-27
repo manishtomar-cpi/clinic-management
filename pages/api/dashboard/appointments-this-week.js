@@ -62,7 +62,7 @@ export default async function handler(req, res) {
 
 function getStartOfWeek(date) {
   const day = date.getDay(); // 0 (Sun) to 6 (Sat)
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust if Sunday
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1); 
   const startOfWeek = new Date(date);
   startOfWeek.setDate(diff);
   startOfWeek.setHours(0, 0, 0, 0);
