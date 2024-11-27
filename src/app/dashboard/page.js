@@ -1,4 +1,3 @@
-// src/app/dashboard/page.js
 
 "use client";
 
@@ -22,7 +21,7 @@ import PatientBalance from "../components/PatientBalance";
 import OngoingPatients from "../components/OngoingPatients";
 import AppointmentsToday from "../components/AppointmentsToday";
 import AddVisit from "../components/AddVisit";
-import MissedAppointments from "../components/MissedAppointments"; // Ensure this is correctly imported
+import MissedAppointments from "../components/MissedAppointments"; 
 import { decryptData } from "../../lib/encryption";
 import { db } from "../../db";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
