@@ -1,7 +1,7 @@
 
 import { db } from '../../../src/db';
 import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
-import bcrypt from 'bcryptjs'; // Ensure bcryptjs is imported
+import bcrypt from 'bcryptjs'; 
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     const userDoc = querySnapshot.docs[0];
     const userDocRef = doc(db, 'users', userDoc.id);
 
-    // **Hash** the new password using bcrypt
+    // Hash the new password using bcrypt
     const hashedPassword = await bcrypt.hash(newPassword, 10); // 10 salt rounds
 
     // Update the user's password in Firestore
